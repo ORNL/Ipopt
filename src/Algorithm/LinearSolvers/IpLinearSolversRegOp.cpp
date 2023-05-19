@@ -12,6 +12,7 @@
 
 #include "IpMa27TSolverInterface.hpp"
 #include "IpMa57TSolverInterface.hpp"
+#include "IpKLUSolverInterface.hpp"
 #include "IpMa77SolverInterface.hpp"
 #include "IpMa86SolverInterface.hpp"
 #include "IpMa97SolverInterface.hpp"
@@ -54,6 +55,12 @@ void RegisterOptions_LinearSolvers(
    {
       roptions->SetRegisteringCategory("MA57 Linear Solver");
       Ma57TSolverInterface::RegisterOptions(roptions);
+   }
+
+   if( availablesolvers & IPOPTLINEARSOLVER_KLU )
+   {
+      roptions->SetRegisteringCategory("KLU Linear Solver");
+      KLUSolverInterface::RegisterOptions(roptions);
    }
 
    if( availablesolvers & IPOPTLINEARSOLVER_MA77 )

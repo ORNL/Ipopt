@@ -23,6 +23,10 @@ IpoptLinearSolver IpoptGetAvailableLinearSolvers(
    solvers |= IPOPTLINEARSOLVER_MA57;
 #endif
 
+#if (defined(IPOPT_SINGLE) && defined(COINHSL_HAS_MA57S)) || (!defined(IPOPT_SINGLE) && defined(COINHSL_HAS_MA57))
+   solvers |= IPOPTLINEARSOLVER_KLU;
+#endif
+
 #if (defined(IPOPT_SINGLE) && defined(COINHSL_HAS_MA77S)) || (!defined(IPOPT_SINGLE) && defined(COINHSL_HAS_MA77))
    solvers |= IPOPTLINEARSOLVER_MA77;
 #endif
@@ -66,6 +70,7 @@ IpoptLinearSolver IpoptGetAvailableLinearSolvers(
 #ifndef IPOPT_INT64
       solvers |= IPOPTLINEARSOLVER_MA27;
       solvers |= IPOPTLINEARSOLVER_MA57;
+      solvers |= IPOPTLINEARSOLVER_KLU;
       solvers |= IPOPTLINEARSOLVER_MA77;
       solvers |= IPOPTLINEARSOLVER_MA86;
       solvers |= IPOPTLINEARSOLVER_MA97;

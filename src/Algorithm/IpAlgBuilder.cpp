@@ -54,6 +54,7 @@
 #include "IpLinearSolvers.h"
 #include "IpMa27TSolverInterface.hpp"
 #include "IpMa57TSolverInterface.hpp"
+#include "IpKLUSolverInterface.hpp"
 #include "IpMa77SolverInterface.hpp"
 #include "IpMa86SolverInterface.hpp"
 #include "IpMa97SolverInterface.hpp"
@@ -122,6 +123,19 @@ void AlgorithmBuilder::RegisterOptions(
       else
       {
          descrs.push_back("load the Harwell routine MA57 from library at runtime");
+      }
+   }
+
+   if( availablesolvers & IPOPTLINEARSOLVER_KLU )
+   {
+      options.push_back("klu");
+      if( availablesolverslinked & IPOPTLINEARSOLVER_KLU )
+      {
+         descrs.push_back("use the Harwell routine KLU");
+      }
+      else
+      {
+         descrs.push_back("load the Harwell routine KLU from library at runtime");
       }
    }
 
@@ -212,6 +226,10 @@ void AlgorithmBuilder::RegisterOptions(
    else if( availablesolverslinked & IPOPTLINEARSOLVER_MA57 )
    {
       defaultsolver = "ma57";
+   }
+   else if( availablesolverslinked & IPOPTLINEARSOLVER_KLU )
+   {
+      defaultsolver = "klu";
    }
    else if( availablesolverslinked & IPOPTLINEARSOLVER_MA97 )
    {
@@ -447,6 +465,11 @@ SmartPtr<SymLinearSolver> AlgorithmBuilder::SymLinearSolverFactory(
       SolverInterface = new Ma57TSolverInterface(GetHSLLoader(options, prefix));
    }
 
+   else if( linear_solver == "klu" )
+   {
+      SolverInterface = new KLUSolverInterface(GetHSLLoader(options, prefix));
+   }
+
    else if( linear_solver == "ma77" )
    {
       SolverInterface = new Ma77SolverInterface(GetHSLLoader(options, prefix));
@@ -531,7 +554,7 @@ SmartPtr<SymLinearSolver> AlgorithmBuilder::SymLinearSolverFactory(
    if( !options.GetStringValue("linear_system_scaling", linear_system_scaling, prefix) )
    {
       // By default, don't use mc19 for non-HSL solvers, or HSL_MA97
-      if( linear_solver != "ma27" && linear_solver != "ma57" && linear_solver != "ma77" && linear_solver != "ma86" )
+      if( linear_solver != "ma27" && linear_solver != "ma57" && linear_solver != "klu" && linear_solver != "ma77" && linear_solver != "ma86" )
       {
          linear_system_scaling = "none";
       }

@@ -194,6 +194,7 @@ libipopt_la_SOURCES += \
   Algorithm/LinearSolvers/IpMc19TSymScalingMethod.cpp \
   Algorithm/LinearSolvers/IpMa27TSolverInterface.cpp \
   Algorithm/LinearSolvers/IpMa57TSolverInterface.cpp \
+  Algorithm/LinearSolvers/IpKLUSolverInterface.cpp \
   Algorithm/LinearSolvers/IpMa77SolverInterface.cpp \
   Algorithm/LinearSolvers/IpMa86SolverInterface.cpp \
   Algorithm/LinearSolvers/IpMa97SolverInterface.cpp \

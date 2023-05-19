@@ -101,6 +101,7 @@ host_triplet = @host@
 @IPOPT_INT64_FALSE@  Algorithm/LinearSolvers/IpMc19TSymScalingMethod.cpp \
 @IPOPT_INT64_FALSE@  Algorithm/LinearSolvers/IpMa27TSolverInterface.cpp \
 @IPOPT_INT64_FALSE@  Algorithm/LinearSolvers/IpMa57TSolverInterface.cpp \
+@IPOPT_INT64_FALSE@  Algorithm/LinearSolvers/IpKLUSolverInterface.cpp \
 @IPOPT_INT64_FALSE@  Algorithm/LinearSolvers/IpMa77SolverInterface.cpp \
 @IPOPT_INT64_FALSE@  Algorithm/LinearSolvers/IpMa86SolverInterface.cpp \
 @IPOPT_INT64_FALSE@  Algorithm/LinearSolvers/IpMa97SolverInterface.cpp \
@@ -177,6 +178,7 @@ am__dirstamp = $(am__leading_dot)dirstamp
 @IPOPT_INT64_FALSE@am__objects_2 = Algorithm/LinearSolvers/IpMc19TSymScalingMethod.lo \
 @IPOPT_INT64_FALSE@	Algorithm/LinearSolvers/IpMa27TSolverInterface.lo \
 @IPOPT_INT64_FALSE@	Algorithm/LinearSolvers/IpMa57TSolverInterface.lo \
+@IPOPT_INT64_FALSE@	Algorithm/LinearSolvers/IpKLUSolverInterface.lo \
 @IPOPT_INT64_FALSE@	Algorithm/LinearSolvers/IpMa77SolverInterface.lo \
 @IPOPT_INT64_FALSE@	Algorithm/LinearSolvers/IpMa86SolverInterface.lo \
 @IPOPT_INT64_FALSE@	Algorithm/LinearSolvers/IpMa97SolverInterface.lo \
@@ -367,6 +369,7 @@ am__depfiles_remade = Algorithm/$(DEPDIR)/IpAdaptiveMuUpdate.Plo \
 	Algorithm/LinearSolvers/$(DEPDIR)/IpMa27TSolverInterface.Plo \
 	Algorithm/LinearSolvers/$(DEPDIR)/IpMa28TDependencyDetector.Plo \
 	Algorithm/LinearSolvers/$(DEPDIR)/IpMa57TSolverInterface.Plo \
+	Algorithm/LinearSolvers/$(DEPDIR)/IpKLUSolverInterface.Plo \
 	Algorithm/LinearSolvers/$(DEPDIR)/IpMa77SolverInterface.Plo \
 	Algorithm/LinearSolvers/$(DEPDIR)/IpMa86SolverInterface.Plo \
 	Algorithm/LinearSolvers/$(DEPDIR)/IpMa97SolverInterface.Plo \
@@ -1216,6 +1219,9 @@ Algorithm/LinearSolvers/IpMa27TSolverInterface.lo:  \
 Algorithm/LinearSolvers/IpMa57TSolverInterface.lo:  \
 	Algorithm/LinearSolvers/$(am__dirstamp) \
 	Algorithm/LinearSolvers/$(DEPDIR)/$(am__dirstamp)
+Algorithm/LinearSolvers/IpKLUSolverInterface.lo:  \
+	Algorithm/LinearSolvers/$(am__dirstamp) \
+	Algorithm/LinearSolvers/$(DEPDIR)/$(am__dirstamp)
 Algorithm/LinearSolvers/IpMa77SolverInterface.lo:  \
 	Algorithm/LinearSolvers/$(am__dirstamp) \
 	Algorithm/LinearSolvers/$(DEPDIR)/$(am__dirstamp)
@@ -1388,6 +1394,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@Algorithm/LinearSolvers/$(DEPDIR)/IpMa27TSolverInterface.Plo@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@Algorithm/LinearSolvers/$(DEPDIR)/IpMa28TDependencyDetector.Plo@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@Algorithm/LinearSolvers/$(DEPDIR)/IpMa57TSolverInterface.Plo@am__quote@ # am--include-marker
+@AMDEP_TRUE@@am__include@ @am__quote@Algorithm/LinearSolvers/$(DEPDIR)/IpKLUSolverInterface.Plo@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@Algorithm/LinearSolvers/$(DEPDIR)/IpMa77SolverInterface.Plo@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@Algorithm/LinearSolvers/$(DEPDIR)/IpMa86SolverInterface.Plo@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@Algorithm/LinearSolvers/$(DEPDIR)/IpMa97SolverInterface.Plo@am__quote@ # am--include-marker
@@ -1803,6 +1810,7 @@ distclean: distclean-recursive
 	-rm -f Algorithm/LinearSolvers/$(DEPDIR)/IpMa27TSolverInterface.Plo
 	-rm -f Algorithm/LinearSolvers/$(DEPDIR)/IpMa28TDependencyDetector.Plo
 	-rm -f Algorithm/LinearSolvers/$(DEPDIR)/IpMa57TSolverInterface.Plo
+	-rm -f Algorithm/LinearSolvers/$(DEPDIR)/IpKLUSolverInterface.Plo
 	-rm -f Algorithm/LinearSolvers/$(DEPDIR)/IpMa77SolverInterface.Plo
 	-rm -f Algorithm/LinearSolvers/$(DEPDIR)/IpMa86SolverInterface.Plo
 	-rm -f Algorithm/LinearSolvers/$(DEPDIR)/IpMa97SolverInterface.Plo
@@ -1977,6 +1985,7 @@ maintainer-clean: maintainer-clean-recursive
 	-rm -f Algorithm/LinearSolvers/$(DEPDIR)/IpMa27TSolverInterface.Plo
 	-rm -f Algorithm/LinearSolvers/$(DEPDIR)/IpMa28TDependencyDetector.Plo
 	-rm -f Algorithm/LinearSolvers/$(DEPDIR)/IpMa57TSolverInterface.Plo
+	-rm -f Algorithm/LinearSolvers/$(DEPDIR)/IpKLUSolverInterface.Plo
 	-rm -f Algorithm/LinearSolvers/$(DEPDIR)/IpMa77SolverInterface.Plo
 	-rm -f Algorithm/LinearSolvers/$(DEPDIR)/IpMa86SolverInterface.Plo
 	-rm -f Algorithm/LinearSolvers/$(DEPDIR)/IpMa97SolverInterface.Plo
