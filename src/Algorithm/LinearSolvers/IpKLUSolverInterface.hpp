@@ -20,6 +20,8 @@ typedef ptrdiff_t ma57int;
 typedef ipindex ma57int;
 #endif
 
+#include "klu.h"
+
 /// @since 3.14.0
 #define IPOPT_DECL_MA57A(x) void (x)( \
    ipindex*       n,     /**< Order of matrix. */ \

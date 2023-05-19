@@ -364,6 +364,15 @@ bool KLUSolverInterface::InitializeImpl(
 
    /* Initialize. */
    ma57i(wd_cntl_, wd_icntl_);
+   
+   
+   printf("Hello World! --KLU\n");
+
+   klu_symbolic *Symbolic ;
+   klu_numeric *Numeric ;
+   klu_common Common ;
+  
+   klu_defaults (&Common) ;
    /* Custom settings for MA57. */
    wd_icntl_[0] = 0; /* Error stream */
    wd_icntl_[1] = 0; /* Warning stream. */
