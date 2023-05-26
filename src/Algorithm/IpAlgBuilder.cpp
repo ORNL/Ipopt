@@ -467,7 +467,7 @@ SmartPtr<SymLinearSolver> AlgorithmBuilder::SymLinearSolverFactory(
 
    else if( linear_solver == "klu" )
    {
-      SolverInterface = new KLUSolverInterface(GetHSLLoader(options, prefix));
+      SolverInterface = new KLUSolverInterface();
    }
 
    else if( linear_solver == "ma77" )
