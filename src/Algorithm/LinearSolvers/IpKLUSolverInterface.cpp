@@ -42,6 +42,19 @@ void KLUSolverInterface::RegisterOptions(
    SmartPtr<RegisteredOptions> roptions
 )
 {   
+   roptions->AddNumberOption(
+      "klu_tol",
+      "Partial pivoting tolerance",
+      0.001, 
+      "If the diagonal entry has a magnitude greater than or equal to tol times the largest magnitude of entries in the pivot column, then the diagonal entry is chosen.",
+      false);
+
+   roptions->AddIntegerOption(
+      "klu_ordering",
+      "Which fill-reducing ordering to use",
+      0,
+      "0 for AMD, 1 for COLAMD, 2 for a user-provided permutation P and Q (or a natural ordering if P and Q are NULL), or 3 for the user order function.",
+      false);
 }
 
 bool KLUSolverInterface::InitializeImpl(
@@ -50,8 +63,20 @@ bool KLUSolverInterface::InitializeImpl(
 )
 {
    printf("InitializeImpl! --KLU\n");
-  
+
    klu_defaults(&Common_);
+
+   Number tol;
+   options.GetNumericValue("klu_tol", tol, prefix);
+   Common_.tol = tol;
+
+   printf("klu_tol: %f\n", tol);
+
+   Index order_method;
+   options.GetIntegerValue("klu_ordering", order_method, prefix);
+   Common_.ordering = order_method;
+
+   printf("klu_ordering: %d\n", order_method);
 
    return true;
 }
