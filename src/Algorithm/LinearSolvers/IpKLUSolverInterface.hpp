@@ -108,12 +108,12 @@ private:
    Index numneg_;  ///< Number of negative pivots in last factorization
    bool pivtol_changed_; ///< indicates if pivtol has been changed
 
-   klu_symbolic* Symbolic;
-   klu_numeric* Numeric;
-   klu_common Common;
+   klu_symbolic* Symbolic_;
+   klu_numeric* Numeric_;
+   klu_common Common_;
 
-   int* Ap;
-   int* Ai;
+   int* Ap_;
+   int* Ai_;
 
 };
 

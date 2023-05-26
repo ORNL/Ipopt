@@ -34,6 +34,8 @@ KLUSolverInterface::~KLUSolverInterface()
 {
    DBG_START_METH("KLUSolverInterface::~KLUSolverInterface()", dbg_verbosity);
    delete[] val_;
+   klu_free_symbolic(&Symbolic_, &Common_);
+   klu_free_numeric(&Numeric_, &Common_);
 }
 
 void KLUSolverInterface::RegisterOptions(
@@ -49,7 +51,7 @@ bool KLUSolverInterface::InitializeImpl(
 {
    printf("InitializeImpl! --KLU\n");
   
-   klu_defaults (&Common) ;
+   klu_defaults(&Common_);
 
    return true;
 }
@@ -68,9 +70,9 @@ ESymSolverStatus KLUSolverInterface::MultiSolve(
 
    printf("KLU MultiSolve Called\n");
 
-   Symbolic = klu_analyze(ndim_, Ap, Ai, &Common);
-   Numeric = klu_factor(Ap, Ai, val_, Symbolic, &Common);
-   klu_solve(Symbolic, Numeric, ndim_, nrhs, rhs_vals, &Common);
+   Symbolic_ = klu_analyze(ndim_, Ap_, Ai_, &Common_);
+   Numeric_ = klu_factor(Ap_, Ai_, val_, Symbolic_, &Common_);
+   klu_solve(Symbolic_, Numeric_, ndim_, nrhs, rhs_vals, &Common_);
 
    printf("KLU Solve Done\n");
 
@@ -100,12 +102,12 @@ ESymSolverStatus KLUSolverInterface::InitializeStructure(
 
    // Store size for later use
    ndim_ = dim;
-   Ap = new int[dim+1];
-   Ai = new int[nonzeros];
+   Ap_ = new int[dim+1];
+   Ai_ = new int[nonzeros];
 
    //Copy Structure
-   for(int i=0;i<=dim;i++){Ap[i]=ia[i];}
-   for(int i=0;i<nonzeros;i++){Ai[i]=ja[i];}
+   for(int i=0;i<=dim;i++){Ap_[i]=ia[i];}
+   for(int i=0;i<nonzeros;i++){Ai_[i]=ja[i];}
 
    printf("dim: %d\n, nonzeros %d\n", dim, nonzeros);
 
@@ -124,10 +126,6 @@ ESymSolverStatus KLUSolverInterface::InitializeStructure(
          printf("[%3d]=%3d\t", ia[i]+j, ja[ia[i]+j]);
       }
       printf("\n------------------------------------\n");
-   }
-
-   for(int i=0; i< nonzeros; i++){
-      printf("[%d]=(%d, %d)\n", i, ia[i], ja[i]);
    }
 
    // Setup memory for values
