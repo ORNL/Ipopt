@@ -93,13 +93,60 @@ ESymSolverStatus KLUSolverInterface::MultiSolve(
 {
    DBG_START_METH("KLUSolverInterface::MultiSolve", dbg_verbosity);
 
+#if 0
    printf("KLU MultiSolve Called\n");
+#endif
 
-   Symbolic_ = klu_analyze(ndim_, Ap_, Ai_, &Common_);
-   Numeric_ = klu_factor(Ap_, Ai_, val_, Symbolic_, &Common_);
+#if 1
+   if(factorize_){
+      // perform the factorization
+#if 0
+      printf("klu_factor Called\n");
+#endif
+      Numeric_ = klu_factor(Ap_, Ai_, val_, Symbolic_, &Common_);
+      if( Numeric_ == nullptr )
+      {
+         DBG_PRINT((1, "FACTORIZATION FAILED!\n"));
+         return SYMSOLVER_FATAL_ERROR;  // Matrix singular or error occurred
+      }
+      factorize_ = false;
+   }
+
+   if( pivtol_changed_ )
+   {
+      DBG_PRINT((1, "Pivot tolerance has changed.\n"));
+      pivtol_changed_ = false;
+      // If the pivot tolerance has been changed but the matrix is not
+      // new, we have to request the values for the matrix again to do
+      // the factorization again.
+      if( !new_matrix )
+      {
+         DBG_PRINT((1, "Ask caller to call again.\n"));
+         refactorize_ = true;
+         return SYMSOLVER_CALL_AGAIN;
+      }
+   }
+#endif
+
+#if 1
+   // check if a factorization has to be done
+   DBG_PRINT((1, "new_matrix = %d\n", new_matrix));
+   if( new_matrix || refactorize_ )
+   {
+#if 0
+      printf("klu_refactor Called\n");
+#endif
+      // perform the factorization
+      klu_refactor(Ap_, Ai_, val_, Symbolic_, Numeric_, &Common_);
+      refactorize_ = false;
+   }
+#endif
+
    klu_solve(Symbolic_, Numeric_, ndim_, nrhs, rhs_vals, &Common_);
 
+#if 0
    printf("KLU Solve Done\n");
+#endif
 
    return SYMSOLVER_SUCCESS;
 }
@@ -127,13 +174,30 @@ ESymSolverStatus KLUSolverInterface::InitializeStructure(
 
    // Store size for later use
    ndim_ = dim;
+
+#if 0
    Ap_ = new int[dim+1];
    Ai_ = new int[nonzeros];
 
    //Copy Structure
+   //const_cast<int*> 
    for(int i=0;i<=dim;i++){Ap_[i]=ia[i];}
    for(int i=0;i<nonzeros;i++){Ai_[i]=ja[i];}
+#else
+   Ap_ = const_cast<int*>(ia);
+   Ai_ = const_cast<int*>(ja);
+#endif
 
+   printf("KLU - Symbolic Factorization Done\n");
+   Symbolic_ = klu_analyze(ndim_, Ap_, Ai_, &Common_);
+   factorize_ = true;
+
+   if (Symbolic_ == nullptr){
+      printf("Symbolic_ factorization crashed withCommon_.status = %d \n", Common_.status);
+      return SYMSOLVER_FATAL_ERROR;
+   }
+
+#if 0
    printf("dim: %d\n, nonzeros %d\n", dim, nonzeros);
 
    for(int i=1; i<=dim; i++){
@@ -152,7 +216,7 @@ ESymSolverStatus KLUSolverInterface::InitializeStructure(
       }
       printf("\n------------------------------------\n");
    }
-
+#endif
    // Setup memory for values
    if( val_ != NULL )
    {
