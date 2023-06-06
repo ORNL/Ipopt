@@ -55,6 +55,13 @@ void KLUSolverInterface::RegisterOptions(
       0,
       "0 for AMD, 1 for COLAMD, 2 for a user-provided permutation P and Q (or a natural ordering if P and Q are NULL), or 3 for the user order function.",
       false);
+
+   roptions->AddBoolOption(
+      "klu_halt_if_singular",
+      "how to handle a singular matrix",
+      false,
+      "FALSE: keep going, TRUE: stop quickly.",
+      false);
 }
 
 bool KLUSolverInterface::InitializeImpl(
@@ -69,14 +76,24 @@ bool KLUSolverInterface::InitializeImpl(
    Number tol;
    options.GetNumericValue("klu_tol", tol, prefix);
    Common_.tol = tol;
-
-   printf("klu_tol: %f\n", tol);
+   printf("klu_tol: %f\n", Common_.tol);
 
    Index order_method;
    options.GetIntegerValue("klu_ordering", order_method, prefix);
    Common_.ordering = order_method;
+   printf("klu_ordering: %d\n", Common_.ordering);
 
-   printf("klu_ordering: %d\n", order_method);
+
+   Common_.btf  = 0;
+   printf("klu_btf: %d\n", Common_.btf);
+
+   Common_.scale = -1;
+   printf("klu_scale: %d\n", Common_.scale);
+
+   bool halt_if_singular;
+   options.GetBoolValue("klu_halt_if_singular", halt_if_singular, prefix);
+   Common_.halt_if_singular = halt_if_singular;
+   printf("klu_halt_if_singular: %d\n", Common_.halt_if_singular);
 
    return true;
 }
