@@ -107,6 +107,9 @@ private:
    Number* val_; ///< Storage for variables
    Index numneg_;  ///< Number of negative pivots in last factorization
    bool pivtol_changed_; ///< indicates if pivtol has been changed
+   bool refactorize_;
+   bool factorize_;
+   
 
    klu_symbolic* Symbolic_;
    klu_numeric* Numeric_;
