@@ -23,7 +23,7 @@ IpoptLinearSolver IpoptGetAvailableLinearSolvers(
    solvers |= IPOPTLINEARSOLVER_MA57;
 #endif
 
-#if (defined(IPOPT_SINGLE) && defined(COINHSL_HAS_MA57S)) || (!defined(IPOPT_SINGLE) && defined(COINHSL_HAS_MA57))
+#ifdef IPOPT_HAS_KLU
    solvers |= IPOPTLINEARSOLVER_KLU;
 #endif
 

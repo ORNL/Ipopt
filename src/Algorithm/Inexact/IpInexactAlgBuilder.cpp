@@ -37,7 +37,9 @@
 
 #include "IpMa27TSolverInterface.hpp"
 #include "IpMa57TSolverInterface.hpp"
-#include "IpKLUSolverInterface.hpp"
+#ifdef IPOPT_HAS_KLU
+# include "IpKLUSolverInterface.hpp"
+#endif
 #include "IpMc19TSymScalingMethod.hpp"
 #include "IpInexactTSymScalingMethod.hpp"
 #include "IpIterativePardisoSolverInterface.hpp"
@@ -135,17 +137,19 @@ SmartPtr<IpoptAlgorithm> InexactAlgorithmBuilder::BuildBasicAlgorithm(
       SolverInterface = new Ma57TSolverInterface(GetHSLLoader(options, prefix));
    }
 
-   else if( linear_solver == "klu" )
-   {
-      SolverInterface = new KLUSolverInterface(GetHSLLoader(options, prefix));
-   }
-
    else if( linear_solver == "pardiso" )
    {
       NormalTester = new InexactNormalTerminationTester();
       SmartPtr<IterativeSolverTerminationTester> pd_tester = new InexactPDTerminationTester();
       SolverInterface = new IterativePardisoSolverInterface(*NormalTester, *pd_tester, GetPardisoLoader(options, prefix));
    }
+
+#ifdef IPOPT_HAS_KLU
+   else if( linear_solver == "klu" )
+   {
+      SolverInterface = new KLUSolverInterface(GetHSLLoader(options, prefix));
+   }
+#endif
 
 #ifdef IPOPT_HAS_WSMP
    else if( linear_solver == "wsmp" )

@@ -130,6 +130,8 @@ host_triplet = @host@
 @BUILD_INEXACT_TRUE@  Algorithm/Inexact/IpIterativeSolverTerminationTester.cpp
 
 @BUILD_JAVA_TRUE@am__append_10 = Interfaces/IpStdJInterface.cpp org_coinor_Ipopt.h
+@HAVE_KLU_TRUE@am__append_11 = Algorithm/LinearSolvers/IpKLUSolverInterface.cpp
+
 subdir = src
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
 am__aclocal_m4_deps = $(top_srcdir)/configure.ac
@@ -178,7 +180,6 @@ am__dirstamp = $(am__leading_dot)dirstamp
 @IPOPT_INT64_FALSE@am__objects_2 = Algorithm/LinearSolvers/IpMc19TSymScalingMethod.lo \
 @IPOPT_INT64_FALSE@	Algorithm/LinearSolvers/IpMa27TSolverInterface.lo \
 @IPOPT_INT64_FALSE@	Algorithm/LinearSolvers/IpMa57TSolverInterface.lo \
-@IPOPT_INT64_FALSE@	Algorithm/LinearSolvers/IpKLUSolverInterface.lo \
 @IPOPT_INT64_FALSE@	Algorithm/LinearSolvers/IpMa77SolverInterface.lo \
 @IPOPT_INT64_FALSE@	Algorithm/LinearSolvers/IpMa86SolverInterface.lo \
 @IPOPT_INT64_FALSE@	Algorithm/LinearSolvers/IpMa97SolverInterface.lo \
@@ -206,6 +207,7 @@ am__dirstamp = $(am__leading_dot)dirstamp
 @BUILD_INEXACT_TRUE@	Algorithm/Inexact/IpIterativePardisoSolverInterface.lo \
 @BUILD_INEXACT_TRUE@	Algorithm/Inexact/IpIterativeSolverTerminationTester.lo
 @BUILD_JAVA_TRUE@am__objects_10 = Interfaces/IpStdJInterface.lo
+@HAVE_KLU_TRUE@am__objects_11 =	Algorithm/LinearSolvers/IpKLUSolverInterface.lo
 am_libipopt_la_OBJECTS = Common/IpDebug.lo Common/IpJournalist.lo \
 	Common/IpObserver.lo Common/IpOptionsList.lo \
 	Common/IpRegOptions.lo Common/IpTaggedObject.lo \
@@ -283,7 +285,7 @@ am_libipopt_la_OBJECTS = Common/IpDebug.lo Common/IpJournalist.lo \
 	Interfaces/IpTNLPReducer.lo $(am__objects_1) $(am__objects_2) \
 	$(am__objects_3) $(am__objects_4) $(am__objects_5) \
 	$(am__objects_6) $(am__objects_7) $(am__objects_8) \
-	$(am__objects_9) $(am__objects_10)
+	$(am__objects_9) $(am__objects_10) $(am__objects_11)
 libipopt_la_OBJECTS = $(am_libipopt_la_OBJECTS)
 AM_V_lt = $(am__v_lt_@AM_V@)
 am__v_lt_ = $(am__v_lt_@AM_DEFAULT_V@)
@@ -861,7 +863,7 @@ libipopt_la_SOURCES = Common/IpDebug.cpp Common/IpJournalist.cpp \
 	Interfaces/IpTNLPReducer.cpp $(am__append_1) $(am__append_2) \
 	$(am__append_3) $(am__append_4) $(am__append_5) \
 	$(am__append_6) $(am__append_7) $(am__append_8) \
-	$(am__append_9) $(am__append_10)
+	$(am__append_9) $(am__append_10) $(am__append_11)
 AM_CPPFLAGS = \
   -I$(srcdir)/Common \
   -I$(srcdir)/LinAlg \

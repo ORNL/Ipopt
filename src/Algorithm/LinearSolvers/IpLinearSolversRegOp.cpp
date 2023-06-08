@@ -12,7 +12,9 @@
 
 #include "IpMa27TSolverInterface.hpp"
 #include "IpMa57TSolverInterface.hpp"
-#include "IpKLUSolverInterface.hpp"
+#ifdef IPOPT_HAS_KLU
+# include "IpKLUSolverInterface.hpp"
+#endif
 #include "IpMa77SolverInterface.hpp"
 #include "IpMa86SolverInterface.hpp"
 #include "IpMa97SolverInterface.hpp"
@@ -57,12 +59,6 @@ void RegisterOptions_LinearSolvers(
       Ma57TSolverInterface::RegisterOptions(roptions);
    }
 
-   if( availablesolvers & IPOPTLINEARSOLVER_KLU )
-   {
-      roptions->SetRegisteringCategory("KLU Linear Solver");
-      KLUSolverInterface::RegisterOptions(roptions);
-   }
-
    if( availablesolvers & IPOPTLINEARSOLVER_MA77 )
    {
       roptions->SetRegisteringCategory("MA77 Linear Solver");
@@ -103,6 +99,14 @@ void RegisterOptions_LinearSolvers(
    {
       roptions->SetRegisteringCategory("Pardiso (MKL) Linear Solver");
       PardisoMKLSolverInterface::RegisterOptions(roptions);
+   }
+#endif
+
+#ifdef IPOPT_HAS_KLU
+   if( availablesolvers & IPOPTLINEARSOLVER_KLU )
+   {
+      roptions->SetRegisteringCategory("KLU Linear Solver");
+      KLUSolverInterface::RegisterOptions(roptions);
    }
 #endif
 

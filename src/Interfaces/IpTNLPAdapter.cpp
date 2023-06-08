@@ -25,6 +25,9 @@
 #ifdef IPOPT_HAS_MUMPS
 # include "IpMumpsSolverInterface.hpp"
 #endif
+#ifdef IPOPT_HAS_KLU
+# include "IpKLUSolverInterface.hpp"
+#endif
 #ifdef IPOPT_HAS_WSMP
 # include "IpWsmpSolverInterface.hpp"
 #endif
@@ -118,6 +121,10 @@ void TNLPAdapter::RegisterOptions(
 #ifdef IPOPT_HAS_MUMPS
    options.push_back("mumps");
    descrs.push_back("use MUMPS");
+#endif
+#ifdef IPOPT_HAS_KLU
+   options.push_back("klu");
+   descrs.push_back("use KLU");
 #endif
 #ifdef IPOPT_HAS_WSMP
    options.push_back("wsmp");
@@ -271,6 +278,17 @@ bool TNLPAdapter::ProcessOptions(
    {
       SmartPtr<SparseSymLinearSolverInterface> SolverInterface;
       SolverInterface = new MumpsSolverInterface();
+      SmartPtr<TSymLinearSolver> ScaledSolver =
+         new TSymLinearSolver(SolverInterface, NULL);
+      dependency_detector_ = new TSymDependencyDetector(*ScaledSolver);
+   }
+#endif
+
+#ifdef IPOPT_HAS_KLU
+   if( dependency_detector == "klu" )
+   {
+      SmartPtr<SparseSymLinearSolverInterface> SolverInterface;
+      SolverInterface = new KLUSolverInterface();
       SmartPtr<TSymLinearSolver> ScaledSolver =
          new TSymLinearSolver(SolverInterface, NULL);
       dependency_detector_ = new TSymDependencyDetector(*ScaledSolver);

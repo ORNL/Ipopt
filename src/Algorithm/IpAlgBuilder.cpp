@@ -54,7 +54,9 @@
 #include "IpLinearSolvers.h"
 #include "IpMa27TSolverInterface.hpp"
 #include "IpMa57TSolverInterface.hpp"
-#include "IpKLUSolverInterface.hpp"
+#ifdef IPOPT_HAS_KLU
+# include "IpKLUSolverInterface.hpp"
+#endif
 #include "IpMa77SolverInterface.hpp"
 #include "IpMa86SolverInterface.hpp"
 #include "IpMa97SolverInterface.hpp"
@@ -465,11 +467,6 @@ SmartPtr<SymLinearSolver> AlgorithmBuilder::SymLinearSolverFactory(
       SolverInterface = new Ma57TSolverInterface(GetHSLLoader(options, prefix));
    }
 
-   else if( linear_solver == "klu" )
-   {
-      SolverInterface = new KLUSolverInterface();
-   }
-
    else if( linear_solver == "ma77" )
    {
       SolverInterface = new Ma77SolverInterface(GetHSLLoader(options, prefix));
@@ -502,6 +499,13 @@ SmartPtr<SymLinearSolver> AlgorithmBuilder::SymLinearSolverFactory(
    else if( linear_solver == "spral" )
    {
       SolverInterface = new SpralSolverInterface();
+   }
+#endif
+
+#ifdef IPOPT_HAS_KLU
+   else if( linear_solver == "klu" )
+   {
+      SolverInterface = new KLUSolverInterface();
    }
 #endif
 
