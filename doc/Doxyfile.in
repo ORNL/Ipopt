@@ -2134,6 +2134,7 @@ PREDEFINED             = IPOPT_HAS_ASL \
                          IPOPT_HAS_HSL \
                          IPOPT_HAS_LAPACK \
                          IPOPT_HAS_MUMPS \
+                         IPOPT_HAS_KLU \
                          IPOPT_HAS_SPRAL \
                          IPOPT_HAS_LINEARSOLVERLOADER \
                          HAVE_CFLOAT \
@@ -2144,6 +2145,7 @@ PREDEFINED             = IPOPT_HAS_ASL \
                          HAVE_SNPRINTF \
                          HAVE_VA_COPY \
                          HAVE_VSNPRINTF \
+                         HAVE_KLU \
                          HAVE_WSMP \
                          F77_FUNC(x)=x \
                          IPOPT_LAPACK_FUNC(x)=x \

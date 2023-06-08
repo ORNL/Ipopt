@@ -693,6 +693,8 @@ BIT32FCOMMENT
 BITS_PER_POINTER
 HAVE_WSMP_FALSE
 HAVE_WSMP_TRUE
+HAVE_KLU_FALSE
+HAVE_KLU_TRUE
 COIN_HAS_SPRAL_FALSE
 COIN_HAS_SPRAL_TRUE
 HAVE_PARDISO_MKL_FALSE
@@ -915,6 +917,9 @@ with_asl_cflags
 with_mumps
 with_mumps_lflags
 with_mumps_cflags
+with_klu
+with_klu_lflags
+with_klu_cflags
 enable_mpiinit
 with_hsl
 with_hsl_lflags
@@ -1679,6 +1684,12 @@ Optional Packages:
                           environment. (Most often, -I specs for header file
                           directories.)
   --with-wsmp             specify WSMP library
+  --with-klu              specify KLU library
+  --with-klu-lflags       Linker flags for KLU appropriate for your
+                          environment. (Most often, -l specs for libraries.)
+  --with-klu-cflags       Compiler flags for KLU appropriate for your
+                          environment. (Most often, -I specs for header file
+                          directories.)
 
 Some influential environment variables:
   CC          C compiler command
@@ -25405,6 +25416,97 @@ else
   COIN_HAS_SPRAL_FALSE=
 fi
 
+fi
+
+#######
+# KLU #
+#######
+
+  { printf "%s\n" "$as_me:${as_lineno-$LINENO}: checking for package KLU" >&5
+printf %s "checking for package KLU... " >&6; }
+
+
+# Check whether --with-klu was given.
+if test ${with_klu+y}
+then :
+  withval=$with_klu; have_klu=yes; klu_lflags=$withval
+else $as_nop
+  have_klu=no
+fi
+
+# Check whether --with-klu-lflags was given.
+if test ${with_klu_lflags+y}
+then :
+  withval=$with_klu_lflags;
+fi
+
+# Check whether --with-klu-cflags was given.
+if test ${with_klu_cflags+y}
+then :
+  withval=$with_klu_cflags;
+fi
+
+have_klu=requested
+klu_lflags=
+klu_cflags=
+
+if test -n "$with_klu_lflags" ||
+    test -n "$with_klu_cflags" ; then
+  have_klu=requested
+fi
+
+if test "$have_klu" != skipping ; then
+  withval="$with_klu_lflags"
+  if test -n "$withval" ; then
+    case "$withval" in
+      build | no | yes )
+        as_fn_error $? "\"$withval\" is not useful here; please specify link flags appropriate for your environment." "$LINENO" 5
+        ;;
+      * )
+        have_klu=yes
+        klu_lflags="$withval"
+        ;;
+    esac
+  fi
+
+  withval="$with_klu_cflags"
+  if test -n "$withval" ; then
+    case "$withval" in
+      build | no | yes )
+        as_fn_error $? "\"$withval\" is not useful here; please specify compile flags appropriate for your environment." "$LINENO" 5
+        ;;
+      * )
+        have_klu=yes
+        klu_cflags="$withval"
+        ;;
+    esac
+  fi
+
+  { printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: $have_klu" >&5
+printf "%s\n" "$have_klu" >&6; }
+fi
+  
+if test "$have_klu" != yes ; then
+  have_klu=no
+fi
+
+if test $have_klu = yes ; then
+  ac_save_LIBS="$LIBS"
+  #LIBS="$klu_lflags $LIBS"
+  printf "%s\n" "#define IPOPT_HAS_KLU 1" >>confdefs.h
+  IPOPTLIB_LFLAGS="$klu_lflags $IPOPTLIB_LFLAGS"
+  IPOPTLIB_CFLAGS="$klu_cflags $IPOPTLIB_CFLAGS"
+fi
+
+printf "%s\n" "$klu_lflags $with_klu " >&6
+printf "%s\n" "$klu_cflags $with_klu " >&6
+
+if test $have_klu = yes; then
+  HAVE_KLU_TRUE=
+  HAVE_KLU_FALSE='#'
+else
+  HAVE_KLU_TRUE='#'
+  HAVE_KLU_FALSE=
 fi
 
 ########

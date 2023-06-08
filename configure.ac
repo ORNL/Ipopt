@@ -243,6 +243,24 @@ else
   AM_CONDITIONAL([COIN_HAS_SPRAL],[false])
 fi
 
+#######
+# KLU #
+#######
+
+AC_ARG_WITH([klu],
+            AS_HELP_STRING([--with-klu],[specify KLU library]),
+            [have_klu=yes; klu_lflags=$withval],
+            [have_klu=no])
+
+if test $have_klu = yes ; then
+  AC_COIN_TRY_LINK([klu],[$klu_lflags],[],
+    [have_klu=yes
+     AC_DEFINE(IPOPT_HAS_KLU,1,[Define to 1 if KLU is available])
+    ])
+fi
+
+AM_CONDITIONAL([HAVE_KLU],[test $have_klu = yes])
+
 ########
 # WSMP #
 ########

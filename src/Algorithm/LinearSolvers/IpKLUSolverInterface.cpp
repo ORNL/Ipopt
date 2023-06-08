@@ -56,6 +56,20 @@ void KLUSolverInterface::RegisterOptions(
       "0 for AMD, 1 for COLAMD, 2 for a user-provided permutation P and Q (or a natural ordering if P and Q are NULL), or 3 for the user order function.",
       false);
 
+   roptions->AddIntegerOption(
+      "klu_btf",
+      "Use BTF",
+      1,
+      "if nonzero, then BTF is used to permute the input matrix into block upper triangular form.",
+      false);
+
+   roptions->AddIntegerOption(
+      "klu_scale",
+      "Whether or not the matrix should be scaled",
+      2,
+      "If scale < 0, then no scaling is performed and the input matrix is not checked for errors. If scale >= 0, the input matrix is check for errors. If scale=0, then no scaling is performed. If scale=1, then each row of A is divided by the sum of the absolute values in that row. If scale=2, then each row of A is divided by the maximum absolute value in that row. Default: 2.",
+      false);
+
    roptions->AddBoolOption(
       "klu_halt_if_singular",
       "how to handle a singular matrix",
@@ -83,11 +97,14 @@ bool KLUSolverInterface::InitializeImpl(
    Common_.ordering = order_method;
    printf("klu_ordering: %d\n", Common_.ordering);
 
-
-   Common_.btf  = 0;
+   Index btf;
+   options.GetIntegerValue("klu_btf", btf, prefix);
+   Common_.btf = btf;
    printf("klu_btf: %d\n", Common_.btf);
 
-   Common_.scale = -1;
+   Index scale;
+   options.GetIntegerValue("klu_scale", scale, prefix);
+   Common_.scale = scale;
    printf("klu_scale: %d\n", Common_.scale);
 
    bool halt_if_singular;
