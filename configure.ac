@@ -247,19 +247,17 @@ fi
 # KLU #
 #######
 
-AC_ARG_WITH([klu],
-            AS_HELP_STRING([--with-klu],[specify KLU library]),
-            [have_klu=yes; klu_lflags=$withval],
-            [have_klu=no])
-
-if test $have_klu = yes ; then
-  AC_COIN_TRY_LINK([klu],[$klu_lflags],[],
-    [have_klu=yes
-     AC_DEFINE(IPOPT_HAS_KLU,1,[Define to 1 if KLU is available])
-    ])
+# check for Spral only if building for double precision
+if test $precision = double ; then
+  AC_LANG_PUSH(C)
+  AC_COIN_CHK_LIBHDR(Klu,[IpoptLib],[-lklu],[],[],
+    [klu_defaults((klu_common*)0);],
+    [#include "klu.h"],
+    [default_use])
+  AC_LANG_POP(C)
+else
+  AM_CONDITIONAL([COIN_HAS_KLU],[false])
 fi
-
-AM_CONDITIONAL([HAVE_KLU],[test $have_klu = yes])
 
 ########
 # WSMP #

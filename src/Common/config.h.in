@@ -110,6 +110,9 @@
 /* Define to 1 if HSL is available. */
 #undef IPOPT_HAS_HSL
 
+/* Define to 1 if the Klu package is available */
+#undef IPOPT_HAS_KLU
+
 /* Define to 1 if the LAPACK package is available */
 #undef IPOPT_HAS_LAPACK
 
@@ -137,9 +140,6 @@
 
 /* Define to 1 if WSMP is available */
 #undef IPOPT_HAS_WSMP
-
-/* Define to 1 if KLU is available */
-#undef IPOPT_HAS_KLU
 
 /* Define to a macro mangling the given C identifier (in lower and upper
    case). */
