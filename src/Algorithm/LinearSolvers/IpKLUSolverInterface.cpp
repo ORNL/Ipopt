@@ -1,9 +1,8 @@
-// Copyright (C) 2005, 2009 International Business Machines and others.
+// Copyright (C) 2023 ORNL and others.
 // All Rights Reserved.
 // This code is published under the Eclipse Public License.
 //
-// Authors:  Michael Hagemann               Univ of Basel 2005-10-28
-//               original version (based on MA27TSolverInterface.cpp)
+// Authors:  Slaven Peles, Maksudul Alam
 
 #include "IpoptConfig.h"
 #include "IpKLUSolverInterface.hpp"
@@ -221,7 +220,7 @@ ESymSolverStatus KLUSolverInterface::InitializeStructure(
    factorize_ = true;
 
    if (Symbolic_ == nullptr){
-      printf("Symbolic_ factorization crashed withCommon_.status = %d \n", Common_.status);
+      printf("Symbolic_ factorization crashed with Common_.status = %d \n", Common_.status);
       return SYMSOLVER_FATAL_ERROR;
    }
 
