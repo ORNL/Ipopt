@@ -147,7 +147,7 @@ SmartPtr<IpoptAlgorithm> InexactAlgorithmBuilder::BuildBasicAlgorithm(
 #ifdef IPOPT_HAS_KLU
    else if( linear_solver == "klu" )
    {
-      SolverInterface = new KLUSolverInterface(GetHSLLoader(options, prefix));
+      SolverInterface = new KLUSolverInterface();
    }
 #endif
 

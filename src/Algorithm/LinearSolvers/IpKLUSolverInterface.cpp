@@ -11,12 +11,6 @@
 #include <cmath>
 #include <iostream>
 
-#ifdef IPOPT_HAS_HSL
-#include "CoinHslConfig.h"
-#endif
-
-
-/** MA57 functions from HSL library (symbols resolved at linktime) */
 
 namespace Ipopt
 {

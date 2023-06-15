@@ -70,7 +70,6 @@ IpoptLinearSolver IpoptGetAvailableLinearSolvers(
 #ifndef IPOPT_INT64
       solvers |= IPOPTLINEARSOLVER_MA27;
       solvers |= IPOPTLINEARSOLVER_MA57;
-      solvers |= IPOPTLINEARSOLVER_KLU;
       solvers |= IPOPTLINEARSOLVER_MA77;
       solvers |= IPOPTLINEARSOLVER_MA86;
       solvers |= IPOPTLINEARSOLVER_MA97;
