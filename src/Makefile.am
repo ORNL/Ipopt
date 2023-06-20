@@ -210,7 +210,7 @@ endif  # HAVE_MA28
 
 endif  # IPOPT_INT64
 
-if HAVE_KLU
+if COIN_HAS_KLU
   libipopt_la_SOURCES += Algorithm/LinearSolvers/IpKLUSolverInterface.cpp
 endif
 
