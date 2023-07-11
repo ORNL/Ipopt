@@ -131,14 +131,7 @@ void AlgorithmBuilder::RegisterOptions(
    if( availablesolvers & IPOPTLINEARSOLVER_KLU )
    {
       options.push_back("klu");
-      if( availablesolverslinked & IPOPTLINEARSOLVER_KLU )
-      {
-         descrs.push_back("use the Harwell routine KLU");
-      }
-      else
-      {
-         descrs.push_back("load the Harwell routine KLU from library at runtime");
-      }
+      descrs.push_back("use the KLU package");
    }
 
    if( availablesolvers & IPOPTLINEARSOLVER_MA77 )
