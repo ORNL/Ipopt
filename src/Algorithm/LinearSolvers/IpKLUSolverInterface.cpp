@@ -130,7 +130,15 @@ ESymSolverStatus KLUSolverInterface::MultiSolve(
 #if 0
       printf("klu_factor Called\n");
 #endif
+      if( HaveIpData() )
+      {
+         IpData().TimingStats().LinearSystemFactorization().Start();
+      }
       Numeric_ = klu_factor(Ap_, Ai_, val_, Symbolic_, &Common_);
+      if( HaveIpData() )
+      {
+         IpData().TimingStats().LinearSystemFactorization().End();
+      }
       if( Numeric_ == nullptr )
       {
          DBG_PRINT((1, "FACTORIZATION FAILED!\n"));
@@ -164,12 +172,28 @@ ESymSolverStatus KLUSolverInterface::MultiSolve(
       printf("klu_refactor Called\n");
 #endif
       // perform the factorization
+      if( HaveIpData() )
+      {
+         IpData().TimingStats().LinearSystemFactorization().Start();
+      }
       klu_refactor(Ap_, Ai_, val_, Symbolic_, Numeric_, &Common_);
       refactorize_ = false;
+      if( HaveIpData() )
+      {
+         IpData().TimingStats().LinearSystemFactorization().End();
+      }
    }
 #endif
 
+   if( HaveIpData() )
+   {
+      IpData().TimingStats().LinearSystemBackSolve().Start();
+   }
    klu_solve(Symbolic_, Numeric_, ndim_, nrhs, rhs_vals, &Common_);
+   if( HaveIpData() )
+   {
+      IpData().TimingStats().LinearSystemBackSolve().End();
+   }
 
 #if 0
    printf("KLU Solve Done\n");
@@ -215,8 +239,17 @@ ESymSolverStatus KLUSolverInterface::InitializeStructure(
    Ai_ = const_cast<int*>(ja);
 #endif
 
-   printf("KLU - Symbolic Factorization Done\n");
+   if( HaveIpData() )
+   {
+      IpData().TimingStats().LinearSystemSymbolicFactorization().Start();
+   }
    Symbolic_ = klu_analyze(ndim_, Ap_, Ai_, &Common_);
+   if( HaveIpData() )
+   {
+      IpData().TimingStats().LinearSystemSymbolicFactorization().End();
+   }   
+   printf("KLU - Symbolic Factorization Done\n");
+   
    factorize_ = true;
 
    if (Symbolic_ == nullptr){
