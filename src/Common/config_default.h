@@ -50,6 +50,9 @@
 /* Define to 1 if KLU is available */
 /* #undef IPOPT_HAS_KLU */
 
+/* Define to 1 if ReSolve is available */
+/* #undef IPOPT_HAS_RESOLVE */
+
 /* Define to 1 if WSMP is available */
 /* #undef IPOPT_HAS_WSMP */
 

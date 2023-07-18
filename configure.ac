@@ -247,7 +247,7 @@ fi
 # KLU #
 #######
 
-# check for Spral only if building for double precision
+# check for KLU only if building for double precision
 if test $precision = double ; then
   AC_LANG_PUSH(C)
   AC_COIN_CHK_LIBHDR(Klu,[IpoptLib],[-lklu],[],[],
@@ -257,6 +257,22 @@ if test $precision = double ; then
   AC_LANG_POP(C)
 else
   AM_CONDITIONAL([COIN_HAS_KLU],[false])
+fi
+
+###########
+# ReSolve #
+###########
+
+# check for Spral only if building for double precision
+if test $precision = double ; then
+  AC_LANG_PUSH(C)
+  AC_COIN_CHK_LIBHDR(ReSolve,[IpoptLib],[-lklu],[],[],
+    [klu_defaults((klu_common*)0);],
+    [#include "klu.h"],
+    [default_use])
+  AC_LANG_POP(C)
+else
+  AM_CONDITIONAL([COIN_HAS_RESOLVE],[false])
 fi
 
 ########

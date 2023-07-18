@@ -130,6 +130,7 @@ host_triplet = @host@
 @BUILD_INEXACT_TRUE@  Algorithm/Inexact/IpIterativeSolverTerminationTester.cpp
 
 @BUILD_JAVA_TRUE@am__append_11 = Interfaces/IpStdJInterface.cpp org_coinor_Ipopt.h
+@COIN_HAS_RESOLVE_TRUE@am__append_12 = Algorithm/LinearSolvers/IpReSolveSolverInterface.cpp
 subdir = src
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
 am__aclocal_m4_deps = $(top_srcdir)/configure.ac
@@ -206,6 +207,7 @@ am__dirstamp = $(am__leading_dot)dirstamp
 @BUILD_INEXACT_TRUE@	Algorithm/Inexact/IpIterativePardisoSolverInterface.lo \
 @BUILD_INEXACT_TRUE@	Algorithm/Inexact/IpIterativeSolverTerminationTester.lo
 @BUILD_JAVA_TRUE@am__objects_11 = Interfaces/IpStdJInterface.lo
+@COIN_HAS_RESOLVE_TRUE@am__objects_12 = Algorithm/LinearSolvers/IpReSolveSolverInterface.lo
 am_libipopt_la_OBJECTS = Common/IpDebug.lo Common/IpJournalist.lo \
 	Common/IpObserver.lo Common/IpOptionsList.lo \
 	Common/IpRegOptions.lo Common/IpTaggedObject.lo \
@@ -283,7 +285,7 @@ am_libipopt_la_OBJECTS = Common/IpDebug.lo Common/IpJournalist.lo \
 	Interfaces/IpTNLPReducer.lo $(am__objects_1) $(am__objects_2) \
 	$(am__objects_3) $(am__objects_4) $(am__objects_5) \
 	$(am__objects_6) $(am__objects_7) $(am__objects_8) \
-	$(am__objects_9) $(am__objects_10) $(am__objects_11)
+	$(am__objects_9) $(am__objects_10) $(am__objects_11) $(am__objects_12)
 libipopt_la_OBJECTS = $(am_libipopt_la_OBJECTS)
 AM_V_lt = $(am__v_lt_@AM_V@)
 am__v_lt_ = $(am__v_lt_@AM_DEFAULT_V@)
@@ -365,6 +367,7 @@ am__depfiles_remade = Algorithm/$(DEPDIR)/IpAdaptiveMuUpdate.Plo \
 	Algorithm/Inexact/$(DEPDIR)/IpIterativeSolverTerminationTester.Plo \
 	Algorithm/LinearSolvers/$(DEPDIR)/IpIterativeWsmpSolverInterface.Plo \
 	Algorithm/LinearSolvers/$(DEPDIR)/IpKLUSolverInterface.Plo \
+	Algorithm/LinearSolvers/$(DEPDIR)/IpReSolveSolverInterface.Plo \
 	Algorithm/LinearSolvers/$(DEPDIR)/IpLinearSolvers.Plo \
 	Algorithm/LinearSolvers/$(DEPDIR)/IpLinearSolversRegOp.Plo \
 	Algorithm/LinearSolvers/$(DEPDIR)/IpMa27TSolverInterface.Plo \
@@ -861,7 +864,7 @@ libipopt_la_SOURCES = Common/IpDebug.cpp Common/IpJournalist.cpp \
 	Interfaces/IpTNLPReducer.cpp $(am__append_1) $(am__append_2) \
 	$(am__append_3) $(am__append_4) $(am__append_5) \
 	$(am__append_6) $(am__append_7) $(am__append_8) \
-	$(am__append_9) $(am__append_10) $(am__append_11)
+	$(am__append_9) $(am__append_10) $(am__append_11) $(am__append_12)
 AM_CPPFLAGS = \
   -I$(srcdir)/Common \
   -I$(srcdir)/LinAlg \
@@ -1243,6 +1246,9 @@ Algorithm/LinearSolvers/IpMa28Partition.lo:  \
 Algorithm/LinearSolvers/IpKLUSolverInterface.lo:  \
 	Algorithm/LinearSolvers/$(am__dirstamp) \
 	Algorithm/LinearSolvers/$(DEPDIR)/$(am__dirstamp)
+Algorithm/LinearSolvers/IpReSolveSolverInterface.lo:  \
+	Algorithm/LinearSolvers/$(am__dirstamp) \
+	Algorithm/LinearSolvers/$(DEPDIR)/$(am__dirstamp)
 Algorithm/LinearSolvers/IpWsmpSolverInterface.lo:  \
 	Algorithm/LinearSolvers/$(am__dirstamp) \
 	Algorithm/LinearSolvers/$(DEPDIR)/$(am__dirstamp)
@@ -1390,6 +1396,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@Algorithm/Inexact/$(DEPDIR)/IpIterativeSolverTerminationTester.Plo@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@Algorithm/LinearSolvers/$(DEPDIR)/IpIterativeWsmpSolverInterface.Plo@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@Algorithm/LinearSolvers/$(DEPDIR)/IpKLUSolverInterface.Plo@am__quote@ # am--include-marker
+@AMDEP_TRUE@@am__include@ @am__quote@Algorithm/LinearSolvers/$(DEPDIR)/IpReSolveSolverInterface.Plo@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@Algorithm/LinearSolvers/$(DEPDIR)/IpLinearSolvers.Plo@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@Algorithm/LinearSolvers/$(DEPDIR)/IpLinearSolversRegOp.Plo@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@Algorithm/LinearSolvers/$(DEPDIR)/IpMa27TSolverInterface.Plo@am__quote@ # am--include-marker
@@ -1806,6 +1813,7 @@ distclean: distclean-recursive
 	-rm -f Algorithm/Inexact/$(DEPDIR)/IpIterativeSolverTerminationTester.Plo
 	-rm -f Algorithm/LinearSolvers/$(DEPDIR)/IpIterativeWsmpSolverInterface.Plo
 	-rm -f Algorithm/LinearSolvers/$(DEPDIR)/IpKLUSolverInterface.Plo
+	-rm -f Algorithm/LinearSolvers/$(DEPDIR)/IpReSolveSolverInterface.Plo
 	-rm -f Algorithm/LinearSolvers/$(DEPDIR)/IpLinearSolvers.Plo
 	-rm -f Algorithm/LinearSolvers/$(DEPDIR)/IpLinearSolversRegOp.Plo
 	-rm -f Algorithm/LinearSolvers/$(DEPDIR)/IpMa27TSolverInterface.Plo
@@ -1981,6 +1989,7 @@ maintainer-clean: maintainer-clean-recursive
 	-rm -f Algorithm/Inexact/$(DEPDIR)/IpIterativeSolverTerminationTester.Plo
 	-rm -f Algorithm/LinearSolvers/$(DEPDIR)/IpIterativeWsmpSolverInterface.Plo
 	-rm -f Algorithm/LinearSolvers/$(DEPDIR)/IpKLUSolverInterface.Plo
+	-rm -f Algorithm/LinearSolvers/$(DEPDIR)/IpReSolveSolverInterface.Plo
 	-rm -f Algorithm/LinearSolvers/$(DEPDIR)/IpLinearSolvers.Plo
 	-rm -f Algorithm/LinearSolvers/$(DEPDIR)/IpLinearSolversRegOp.Plo
 	-rm -f Algorithm/LinearSolvers/$(DEPDIR)/IpMa27TSolverInterface.Plo

@@ -40,6 +40,9 @@
 #ifdef IPOPT_HAS_KLU
 # include "IpKLUSolverInterface.hpp"
 #endif
+#ifdef IPOPT_HAS_RESOLVE
+# include "IpReSolveSolverInterface.hpp"
+#endif
 #include "IpMc19TSymScalingMethod.hpp"
 #include "IpInexactTSymScalingMethod.hpp"
 #include "IpIterativePardisoSolverInterface.hpp"
@@ -148,6 +151,13 @@ SmartPtr<IpoptAlgorithm> InexactAlgorithmBuilder::BuildBasicAlgorithm(
    else if( linear_solver == "klu" )
    {
       SolverInterface = new KLUSolverInterface();
+   }
+#endif
+
+#ifdef IPOPT_HAS_RESOLVE
+   else if( linear_solver == "resolve" )
+   {
+      SolverInterface = new ReSolveSolverInterface();
    }
 #endif
 

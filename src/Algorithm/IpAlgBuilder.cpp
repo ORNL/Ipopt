@@ -57,6 +57,9 @@
 #ifdef IPOPT_HAS_KLU
 # include "IpKLUSolverInterface.hpp"
 #endif
+#ifdef IPOPT_HAS_RESOLVE
+# include "IpReSolveSolverInterface.hpp"
+#endif
 #include "IpMa77SolverInterface.hpp"
 #include "IpMa86SolverInterface.hpp"
 #include "IpMa97SolverInterface.hpp"
@@ -132,6 +135,12 @@ void AlgorithmBuilder::RegisterOptions(
    {
       options.push_back("klu");
       descrs.push_back("use the KLU package");
+   }
+
+   if( availablesolvers & IPOPTLINEARSOLVER_RESOLVE )
+   {
+      options.push_back("resolve");
+      descrs.push_back("use the ReSolve package");
    }
 
    if( availablesolvers & IPOPTLINEARSOLVER_MA77 )
@@ -225,6 +234,10 @@ void AlgorithmBuilder::RegisterOptions(
    else if( availablesolverslinked & IPOPTLINEARSOLVER_KLU )
    {
       defaultsolver = "klu";
+   }
+   else if( availablesolverslinked & IPOPTLINEARSOLVER_RESOLVE )
+   {
+      defaultsolver = "resolve";
    }
    else if( availablesolverslinked & IPOPTLINEARSOLVER_MA97 )
    {
@@ -502,6 +515,13 @@ SmartPtr<SymLinearSolver> AlgorithmBuilder::SymLinearSolverFactory(
    }
 #endif
 
+#ifdef IPOPT_HAS_RESOLVE
+   else if( linear_solver == "resolve" )
+   {
+      SolverInterface = new ReSolveSolverInterface();
+   }
+#endif
+
 #ifdef IPOPT_HAS_WSMP
    else if( linear_solver == "wsmp" )
    {
@@ -551,7 +571,7 @@ SmartPtr<SymLinearSolver> AlgorithmBuilder::SymLinearSolverFactory(
    if( !options.GetStringValue("linear_system_scaling", linear_system_scaling, prefix) )
    {
       // By default, don't use mc19 for non-HSL solvers, or HSL_MA97
-      if( linear_solver != "ma27" && linear_solver != "ma57" && linear_solver != "klu" && linear_solver != "ma77" && linear_solver != "ma86" )
+      if( linear_solver != "ma27" && linear_solver != "ma57" && linear_solver != "klu" && linear_solver != "resolve" && linear_solver != "ma77" && linear_solver != "ma86" )
       {
          linear_system_scaling = "none";
       }

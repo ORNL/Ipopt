@@ -214,6 +214,10 @@ if COIN_HAS_KLU
   libipopt_la_SOURCES += Algorithm/LinearSolvers/IpKLUSolverInterface.cpp
 endif
 
+if COIN_HAS_KLU
+  libipopt_la_SOURCES += Algorithm/LinearSolvers/IpReSolveSolverInterface.cpp
+endif
+
 if HAVE_WSMP
   libipopt_la_SOURCES += Algorithm/LinearSolvers/IpWsmpSolverInterface.cpp Algorithm/LinearSolvers/IpIterativeWsmpSolverInterface.cpp
 endif

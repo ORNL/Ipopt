@@ -110,8 +110,11 @@
 /* Define to 1 if HSL is available. */
 #undef IPOPT_HAS_HSL
 
-/* Define to 1 if the Klu package is available */
+/* Define to 1 if the KLU package is available */
 #undef IPOPT_HAS_KLU
+
+/* Define to 1 if the ReSolve package is available */
+#undef IPOPT_HAS_RESOLVE
 
 /* Define to 1 if the LAPACK package is available */
 #undef IPOPT_HAS_LAPACK

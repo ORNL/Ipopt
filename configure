@@ -695,6 +695,8 @@ HAVE_WSMP_FALSE
 HAVE_WSMP_TRUE
 COIN_HAS_KLU_FALSE
 COIN_HAS_KLU_TRUE
+COIN_HAS_RESOLVE_FALSE
+COIN_HAS_RESOLVE_TRUE
 COIN_HAS_SPRAL_FALSE
 COIN_HAS_SPRAL_TRUE
 HAVE_PARDISO_MKL_FALSE
@@ -929,6 +931,9 @@ with_spral_cflags
 with_klu
 with_klu_lflags
 with_klu_cflags
+with_resolve
+with_resolve_lflags
+with_resolve_cflags
 with_wsmp
 enable_inexact_solver
 enable_java
@@ -1683,14 +1688,24 @@ Optional Packages:
   --with-spral-cflags     Compiler flags for Spral appropriate for your
                           environment. (Most often, -I specs for header file
                           directories.)
-  --without-klu           Do not use Klu. If an argument is given to
+  --without-klu           Do not use KLU. If an argument is given to
                           --with-klu, then 'yes' is equivalent to
                           --with-klu, 'no' is equivalent to
                           --without-klu and any other argument is applied as
                           for --with-klu-lflags.
-  --with-klu-lflags       Linker flags for Klu appropriate for your
+  --with-klu-lflags       Linker flags for KLU appropriate for your
                           environment. (Most often, -l specs for libraries.)
-  --with-klu-cflags       Compiler flags for Klu appropriate for your
+  --with-klu-cflags       Compiler flags for KLU appropriate for your
+                          environment. (Most often, -I specs for header file
+                          directories.)
+  --without-resolve       Do not use ReSolve. If an argument is given to
+                          --with-resolve, then 'yes' is equivalent to
+                          --with-resolve, 'no' is equivalent to
+                          --without-resolve and any other argument is applied as
+                          for --with-resolve-lflags.
+  --with-resolve-lflags   Linker flags for ReSolve appropriate for your
+                          environment. (Most often, -l specs for libraries.)
+  --with-resolve-cflags   Compiler flags for ReSolve appropriate for your
                           environment. (Most often, -I specs for header file
                           directories.)
   --with-wsmp             specify WSMP library
@@ -25426,7 +25441,7 @@ fi
 # KLU #
 #######
 
-# check for Spral only if building for double precision
+# check for KLU only if building for double precision
 if test $precision = double ; then
   ac_ext=c
 ac_cpp='$CPP $CPPFLAGS'
@@ -25435,17 +25450,8 @@ ac_link='$CC -o conftest$ac_exeext $CFLAGS $CPPFLAGS $LDFLAGS conftest.$ac_ext $
 ac_compiler_gnu=$ac_cv_c_compiler_gnu
 
 
-
-
-
-
   { printf "%s\n" "$as_me:${as_lineno-$LINENO}: checking for library Klu with combined link and compile check" >&5
 printf %s "checking for library Klu with combined link and compile check... " >&6; }
-
-
-
-
-
 
 
   coin_has_klu=noInfo
@@ -25461,14 +25467,11 @@ printf %s "checking for library Klu with combined link and compile check... " >&
   if test "$coin_has_klu" != skipping ; then
 
 
-
-
 # Check whether --with-klu was given.
 if test ${with_klu+y}
 then :
   withval=$with_klu;
 fi
-
 
 
 # Check whether --with-klu-lflags was given.
@@ -25478,20 +25481,11 @@ then :
 fi
 
 
-
 # Check whether --with-klu-cflags was given.
 if test ${with_klu_cflags+y}
 then :
   withval=$with_klu_cflags;
 fi
-
-
-
-
-
-
-
-
 
 
   klu_lflags="-lklu"
@@ -25545,10 +25539,6 @@ fi
          klu_userflags='yes'
        fi
      fi
-
-
-
-
 
 
   if test $coin_has_klu != skipping ; then
@@ -25689,17 +25679,12 @@ else
   COIN_HAS_KLU_FALSE=
 fi
 
-
-
   if test $coin_has_klu = yes ; then
 
 printf "%s\n" "#define IPOPT_HAS_KLU 1" >>confdefs.h
 
     IPOPTLIB_LFLAGS="$klu_lflags $IPOPTLIB_LFLAGS"
        IPOPTLIB_CFLAGS="$klu_cflags $IPOPTLIB_CFLAGS"
-
-
-
 
   fi
 
@@ -25719,6 +25704,264 @@ else
   COIN_HAS_KLU_FALSE=
 fi
 
+fi
+
+###########
+# ReSolve #
+###########
+
+# check for ReSolve only if building for double precision
+if test $precision = double ; then
+  ac_ext=c
+ac_cpp='$CPP $CPPFLAGS'
+ac_compile='$CC -c $CFLAGS $CPPFLAGS conftest.$ac_ext >&5'
+ac_link='$CC -o conftest$ac_exeext $CFLAGS $CPPFLAGS $LDFLAGS conftest.$ac_ext $LIBS >&5'
+ac_compiler_gnu=$ac_cv_c_compiler_gnu
+
+
+  { printf "%s\n" "$as_me:${as_lineno-$LINENO}: checking for library ReSolve with combined link and compile check" >&5
+printf %s "checking for library ReSolve with combined link and compile check... " >&6; }
+
+
+  coin_has_resolve=noInfo
+  if test x"$COIN_SKIP_PROJECTS" != x ; then
+    for pkg in `echo $COIN_SKIP_PROJECTS | tr '[:upper:]' '[:lower:]'` ; do
+      if test "$pkg" = "resolve" ; then
+        coin_has_resolve=skipping
+      fi
+    done
+  fi
+
+  if test "$coin_has_resolve" != skipping ; then
+
+# Check whether --with-resolve was given.
+if test ${with_resolve+y}
+then :
+  withval=$with_resolve;
+fi
+
+# Check whether --with-resolve-lflags was given.
+if test ${with_resolve_lflags+y}
+then :
+  withval=$with_resolve_lflags;
+fi
+
+# Check whether --with-resolve-cflags was given.
+if test ${with_resolve_cflags+y}
+then :
+  withval=$with_resolve_cflags;
+fi
+
+
+  resolve_lflags="-lklu"
+  resolve_cflags=""
+  resolve_data=""
+  coin_has_resolve=requested
+  resolve_userflags='no'
+
+
+  withval="$with_resolve"
+  if test -n "$withval" ; then
+    case "$withval" in
+      no )
+        coin_has_resolve=skipping
+        resolve_failmode='command line'
+        ;;
+      yes )
+        coin_has_resolve=requested
+        resolve_failmode=''
+        ;;
+      * )
+        coin_has_resolve=requested
+        resolve_failmode=''
+        resolve_lflags="$withval"
+        resolve_userflags='yes'
+        ;;
+    esac
+  else
+    if test -n "$with_resolve_lflags" ||
+       test -n "$with_resolve_cflags" ||
+       test -n "$with_resolve_data" ; then
+      coin_has_resolve=requested
+      resolve_failmode=''
+      resolve_userflags='yes'
+    fi
+  fi
+
+
+  if test "$coin_has_resolve" != skipping ; then
+       withval="$with_resolve_lflags"
+       if test -n "$withval" ; then
+         coin_has_resolve=requested
+         resolve_lflags="$withval"
+         resolve_userflags='yes'
+       fi
+
+       withval="$with_resolve_cflags"
+       if test -n "$withval" ; then
+         coin_has_resolve=requested
+         resolve_cflags="$withval"
+         resolve_userflags='yes'
+       fi
+     fi
+
+
+  if test $coin_has_resolve != skipping ; then
+       ac_save_CPPFLAGS=$CPPFLAGS
+       CPPFLAGS="$resolve_cflags"
+       cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+#include "klu.h"
+#ifdef F77_DUMMY_MAIN
+
+#  ifdef __cplusplus
+     extern "C"
+#  endif
+   int F77_DUMMY_MAIN() { return 1; }
+
+#endif
+int
+main (void)
+{
+
+  ;
+  return 0;
+}
+_ACEOF
+if ac_fn_c_try_compile "$LINENO"
+then :
+
+else $as_nop
+  coin_has_klu='no'
+          klu_failmode="header compile"
+fi
+rm -f core conftest.err conftest.$ac_objext conftest.beam conftest.$ac_ext
+       CPPFLAGS=$ac_save_CPPFLAGS
+     fi
+
+
+  if test "$coin_has_resolve" != skipping ; then
+       ac_save_LIBS=$LIBS
+       ac_save_CPPFLAGS=$CPPFLAGS
+       LIBS="$resolve_lflags"
+       CPPFLAGS="$resolve_cflags"
+       cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+#include "klu.h"
+#ifdef F77_DUMMY_MAIN
+
+#  ifdef __cplusplus
+     extern "C"
+#  endif
+   int F77_DUMMY_MAIN() { return 1; }
+
+#endif
+int
+main (void)
+{
+klu_defaults((klu_common*)0);
+  ;
+  return 0;
+}
+_ACEOF
+if ac_fn_c_try_link "$LINENO"
+then :
+
+else $as_nop
+  coin_has_resolve='no'
+            if test -n "$resolve_failmode" ; then
+              resolve_failmode="$resolve_failmode, link with header"
+            else
+              resolve_failmode="link with header"
+            fi
+fi
+rm -f core conftest.err conftest.$ac_objext conftest.beam \
+    conftest$ac_exeext conftest.$ac_ext
+       LIBS=$ac_save_LIBS
+       CPPFLAGS=$ac_save_CPPFLAGS
+     fi
+
+
+  if test $coin_has_resolve = requested ; then
+    coin_has_resolve=yes
+  fi
+
+
+  # Define BUILDTOOLS_DEBUG to enable debugging output
+  if test "$BUILDTOOLS_DEBUG" = 1 ; then
+    { printf "%s\n" "$as_me:${as_lineno-$LINENO}: FIND_PRIM_LIB result for resolve: \"$coin_has_resolve\"" >&5
+printf "%s\n" "$as_me: FIND_PRIM_LIB result for resolve: \"$coin_has_resolve\"" >&6;}
+    { printf "%s\n" "$as_me:${as_lineno-$LINENO}: Collected values for package 'resolve'" >&5
+printf "%s\n" "$as_me: Collected values for package 'resolve'" >&6;}
+    { printf "%s\n" "$as_me:${as_lineno-$LINENO}: resolve_lflags is \"$resolve_lflags\"" >&5
+printf "%s\n" "$as_me: resolve_lflags is \"$resolve_lflags\"" >&6;}
+    { printf "%s\n" "$as_me:${as_lineno-$LINENO}: resolve_cflags is \"$resolve_cflags\"" >&5
+printf "%s\n" "$as_me: resolve_cflags is \"$resolve_cflags\"" >&6;}
+    { printf "%s\n" "$as_me:${as_lineno-$LINENO}: resolve_data is \"$resolve_data\"" >&5
+printf "%s\n" "$as_me: resolve_data is \"$resolve_data\"" >&6;}
+    { printf "%s\n" "$as_me:${as_lineno-$LINENO}: resolve_pcfiles is \"$resolve_pcfiles\"" >&5
+printf "%s\n" "$as_me: resolve_pcfiles is \"$resolve_pcfiles\"" >&6;}
+  fi
+
+    if test -n "$resolve_failmode" ; then
+      { printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: $coin_has_resolve ($resolve_failmode)" >&5
+        printf "%s\n" "$coin_has_resolve ($resolve_failmode)" >&6; }
+    else
+      { printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: $coin_has_resolve" >&5
+        printf "%s\n" "$coin_has_resolve" >&6; }
+    fi
+  else
+    { printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: $coin_has_resolve (COIN_SKIP_PROJECTS)" >&5
+      printf "%s\n" "$coin_has_resolve (COIN_SKIP_PROJECTS)" >&6; }
+  fi
+
+  if test "$coin_has_resolve" = 'no' ; then
+    if expr "$resolve_failmode" : '.*header.*' &>/dev/null ; then
+      { printf "%s\n" "$as_me:${as_lineno-$LINENO}: Compiler flags were \"$resolve_cflags\". Use --with-resolve-cflags to overwrite. Check config.log for details of failed compile attempt." >&5
+        printf "%s\n" "$as_me: Compiler flags were \"$resolve_cflags\". Use --with-resolve-cflags to overwrite. Check config.log for details of failed compile attempt." >&6;}
+    fi
+    if expr "$resolve_failmode" : '.*link.*' &>/dev/null ; then
+      { printf "%s\n" "$as_me:${as_lineno-$LINENO}: Linker flags are \"$resolve_lflags\". Use --with-resolve-lflags to overwrite. Check config.log for details of failed link attempt." >&5
+        printf "%s\n" "$as_me: Linker flags are \"$resolve_lflags\". Use --with-resolve-lflags to overwrite. Check config.log for details of failed link attempt." >&6;}
+    fi
+    if test "$resolve_userflags" = 'yes' ; then
+      as_fn_error $? "user-specified flags for Klu do not work." "$LINENO" 5
+    fi
+  fi
+
+  if test "$coin_has_resolve" != yes ; then
+    coin_has_resolve=no
+  fi
+
+
+  if test $coin_has_resolve = yes; then
+    COIN_HAS_RESOLVE_TRUE=
+    COIN_HAS_RESOLVE_FALSE='#'
+  else
+    COIN_HAS_RESOLVE_TRUE='#'
+    COIN_HAS_RESOLVE_FALSE=
+  fi
+
+  if test $coin_has_resolve = yes ; then
+    printf "%s\n" "#define IPOPT_HAS_RESOLVE 1" >>confdefs.h
+
+    IPOPTLIB_LFLAGS="$resolve_lflags $IPOPTLIB_LFLAGS"
+    IPOPTLIB_CFLAGS="$resolve_cflags $IPOPTLIB_CFLAGS"
+  fi
+
+  ac_ext=c
+  ac_cpp='$CPP $CPPFLAGS'
+  ac_compile='$CC -c $CFLAGS $CPPFLAGS conftest.$ac_ext >&5'
+  ac_link='$CC -o conftest$ac_exeext $CFLAGS $CPPFLAGS $LDFLAGS conftest.$ac_ext $LIBS >&5'
+  ac_compiler_gnu=$ac_cv_c_compiler_gnu
+else
+  if false; then
+    COIN_HAS_RESOLVE_TRUE=
+    COIN_HAS_RESOLVE_FALSE='#'
+  else
+    COIN_HAS_RESOLVE_TRUE='#'
+    COIN_HAS_RESOLVE_FALSE=
+  fi
 fi
 
 ########
@@ -27892,8 +28135,8 @@ if test -z "${COIN_HAS_KLU_TRUE}" && test -z "${COIN_HAS_KLU_FALSE}"; then
   as_fn_error $? "conditional \"COIN_HAS_KLU\" was never defined.
 Usually this means the macro was only invoked conditionally." "$LINENO" 5
 fi
-if test -z "${COIN_HAS_KLU_TRUE}" && test -z "${COIN_HAS_KLU_FALSE}"; then
-  as_fn_error $? "conditional \"COIN_HAS_KLU\" was never defined.
+if test -z "${COIN_HAS_RESOLVE_TRUE}" && test -z "${COIN_HAS_RESOLVE_FALSE}"; then
+  as_fn_error $? "conditional \"COIN_HAS_RESOLVE\" was never defined.
 Usually this means the macro was only invoked conditionally." "$LINENO" 5
 fi
 if test -z "${HAVE_WSMP_TRUE}" && test -z "${HAVE_WSMP_FALSE}"; then
