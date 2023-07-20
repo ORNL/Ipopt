@@ -121,11 +121,10 @@ private:
    bool pivtol_changed_; ///< indicates if pivtol has been changed
    bool refactorize_;
    bool factorize_;
+   bool first_iteration_;
    
 
 
-   int* Ap_;
-   int* Ai_;
    
   ReSolve::LinSolverDirectKLU* resolve_KLU_;
   ReSolve::MatrixCSR* A_;

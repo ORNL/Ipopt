@@ -37,35 +37,35 @@ void ReSolveSolverInterface::RegisterOptions(
 )
 {   
    roptions->AddNumberOption(
-      "klu_tol",
+      "resolve_tol",
       "Partial pivoting tolerance",
       0.001, 
       "If the diagonal entry has a magnitude greater than or equal to tol times the largest magnitude of entries in the pivot column, then the diagonal entry is chosen.",
       false);
 
    roptions->AddIntegerOption(
-      "klu_ordering",
+      "resolve_ordering",
       "Which fill-reducing ordering to use",
       0,
       "0 for AMD, 1 for COLAMD, 2 for a user-provided permutation P and Q (or a natural ordering if P and Q are NULL), or 3 for the user order function.",
       false);
 
    roptions->AddIntegerOption(
-      "klu_btf",
+      "resolve_btf",
       "Use BTF",
       1,
       "if nonzero, then BTF is used to permute the input matrix into block upper triangular form.",
       false);
 
    roptions->AddIntegerOption(
-      "klu_scale",
+      "resolve_scale",
       "Whether or not the matrix should be scaled",
       2,
       "If scale < 0, then no scaling is performed and the input matrix is not checked for errors. If scale >= 0, the input matrix is check for errors. If scale=0, then no scaling is performed. If scale=1, then each row of A is divided by the sum of the absolute values in that row. If scale=2, then each row of A is divided by the maximum absolute value in that row. Default: 2.",
       false);
 
    roptions->AddBoolOption(
-      "klu_halt_if_singular",
+      "resolve_halt_if_singular",
       "how to handle a singular matrix",
       false,
       "FALSE: keep going, TRUE: stop quickly.",
@@ -79,9 +79,23 @@ bool ReSolveSolverInterface::InitializeImpl(
 {
    printf("InitializeImpl! --ReSolve. This uses ReSolve Matrix Definitions.\n");
    
+   /*
+   Number tol;
+   options.GetNumericValue("resolve_tol", tol, prefix);
+
+   Index order_method;
+   options.GetIntegerValue("resolve_ordering", order_method, prefix);
+
+   Index btf;
+   options.GetIntegerValue("resolve_btf", btf, prefix);
+
+   Index scale;
+   options.GetIntegerValue("resolve_scale", scale, prefix);
+
+   bool halt_if_singular;
+   options.GetBoolValue("resolve_halt_if_singular", halt_if_singular, prefix);
+  */
    resolve_KLU_->setupParameters(1, 0.1, false);
-
-
 
    return true;
 }
@@ -113,32 +127,19 @@ ESymSolverStatus ReSolveSolverInterface::MultiSolve(
          IpData().TimingStats().LinearSystemFactorization().Start();
       }
       printf("Factorize Steps 1\n");
-	  resolve_KLU_->factorize();
-	  //printf("Factorize Steps 2\n");
-	  //ReSolve::Matrix* L = resolve_KLU_->getLFactor();
-	  //printf("Factorize Steps 3\n");
-      //ReSolve::Matrix* U = resolve_KLU_->getUFactor();
-	  //printf("Factorize Steps 4\n");
-	  //if (L == nullptr) {printf("ERROR");}
-
-      //ReSolve::index_type* P = resolve_KLU_->getPOrdering();
-	  //printf("Factorize Steps 5\n");
-      //ReSolve::index_type* Q = resolve_KLU_->getQOrdering();
-	  //printf("Factorize Steps 6\n");
-      //resolve_GLU_->setup(A_, L, U, P, Q); 
-	  //printf("Factorize Steps 7\n");
+	  int status  = resolve_KLU_->factorize();
 
       if( HaveIpData() )
       {
          IpData().TimingStats().LinearSystemFactorization().End();
       }
-/*
-      if( Numeric_ == nullptr )
+
+      if( status != 0 )
       {
          DBG_PRINT((1, "FACTORIZATION FAILED!\n"));
          return SYMSOLVER_FATAL_ERROR;  // Matrix singular or error occurred
       }
-*/
+
       factorize_ = false;
    }
 
@@ -158,14 +159,10 @@ ESymSolverStatus ReSolveSolverInterface::MultiSolve(
    }
 #endif
 
-#if 1
    // check if a factorization has to be done
    DBG_PRINT((1, "new_matrix = %d\n", new_matrix));
-   if( new_matrix || refactorize_ )
+   if( !first_iteration_ && (new_matrix || refactorize_) )
    {
-#if 0
-      printf("klu_refactor Called\n");
-#endif
       // perform the factorization
       if( HaveIpData() )
       {
@@ -180,7 +177,6 @@ ESymSolverStatus ReSolveSolverInterface::MultiSolve(
          IpData().TimingStats().LinearSystemFactorization().End();
       }
    }
-#endif
 
    if( HaveIpData() )
    {
@@ -188,39 +184,14 @@ ESymSolverStatus ReSolveSolverInterface::MultiSolve(
    }
    
    
-	printf("vec_rhs_[cpu]=%p\n", (void *)vec_rhs_->getData("cpu"));
-	printf("vec_rhs_[cuda]=%p\n", (void *)vec_rhs_->getData("cuda"));
-	printf("vec_x_[cpu]=%p\n", (void *)vec_x_->getData("cpu"));
-	printf("vec_x_[cuda]=%p\n", (void *)vec_x_->getData("cuda"));   
-	printf("rhs_vals=%p\n", (void *)rhs_vals);   
-   
- 
-   printf("BEFORE: \n");  
-   for(int i=0; i<10; i++){
-        printf("%d=%f\t", i, rhs_vals[i]);
-   }
-   printf("\n");
-   
 
-  //vec_rhs[0] = 1;
-  //vec_rhs[1] = 2;
-   
-   
-   
    // Copy rhs_vals to vec_rhs cuda
    vec_rhs_->update(rhs_vals, "cpu", "cpu");
    int status = resolve_KLU_->solve(vec_rhs_, vec_x_);
    // Copy vec_x cuda to vec_x
-   std::cout<<"GLU solve status: "<<status<<std::endl;  
-   //vec_x_->update(vec_x_->getData("cuda"), "cuda", "cpu");
+   std::cout<<"KLU solve status: "<<status<<std::endl;  
    // copy vec_x to rhs_vals
    std::memcpy(rhs_vals, vec_x_->getData("cpu"), (ndim_) * sizeof(ReSolve::real_type));
-
-   printf("AFTER: \n");  
-   for(int i=0; i<10; i++){
-        printf("%d=%f\t", i, rhs_vals[i]);
-   }
-   printf("\n");
 
    if( HaveIpData() )
    {
@@ -230,6 +201,8 @@ ESymSolverStatus ReSolveSolverInterface::MultiSolve(
 #if 0
    printf("ReSolve Solve Done\n");
 #endif
+
+    first_iteration_ = false;
 
    return SYMSOLVER_SUCCESS;
 }
@@ -258,18 +231,6 @@ ESymSolverStatus ReSolveSolverInterface::InitializeStructure(
    // Store size for later use
    ndim_ = dim;
 
-#if 0
-   Ap_ = new int[dim+1];
-   Ai_ = new int[nonzeros];
-
-   //Copy Structure
-   //const_cast<int*> 
-   for(int i=0;i<=dim;i++){Ap_[i]=ia[i];}
-   for(int i=0;i<nonzeros;i++){Ai_[i]=ja[i];}
-#else
-   Ap_ = const_cast<int*>(ia);
-   Ai_ = const_cast<int*>(ja);
-#endif
 
   A_ = new ReSolve::MatrixCSR(dim, dim, nonzeros);
    if( val_ != NULL )
@@ -292,7 +253,7 @@ ESymSolverStatus ReSolveSolverInterface::InitializeStructure(
    {
       IpData().TimingStats().LinearSystemSymbolicFactorization().Start();
    }
-   resolve_KLU_->analyze();
+   int status = resolve_KLU_->analyze();
    if( HaveIpData() )
    {
       IpData().TimingStats().LinearSystemSymbolicFactorization().End();
@@ -300,13 +261,14 @@ ESymSolverStatus ReSolveSolverInterface::InitializeStructure(
    printf("ReSolve - Symbolic Factorization Done\n");
    
    factorize_ = true;
+   first_iteration_ = true;
 
-/*
-   if (Symbolic_ == nullptr){
-      printf("Symbolic_ factorization crashed with Common_.status = %d \n", Common_.status);
+
+   if (status != 0){
+      printf("Symbolic_ factorization crashed with Common_.status = %d \n", status);
       return SYMSOLVER_FATAL_ERROR;
    }
-*/
+
    initialized_ = true;
 
    return retval;
