@@ -21,49 +21,8 @@
 #include <resolve/MatrixHandler.hpp>
 #include <resolve/VectorHandler.hpp>
 #include <resolve/LinSolverDirectKLU.hpp>
+#include <resolve/LinSolverDirectCuSolverGLU.hpp>
 
-namespace ReSolve
-{
-  class MatrixCSRIpOpt : public Matrix 
-  {
-    public:
-	  MatrixCSRIpOpt(index_type n, index_type m, index_type nnz) : Matrix(n, m, nnz) 
-	  {
-	  }
-	  
-	  ~MatrixCSRIpOpt()
-	  {
-	  }
-	  
-	  virtual index_type* getRowData(std::string memspace){ return h_row_data_; }
-	  
-	  virtual index_type* getColData(std::string memspace){ return h_col_data_; }
-	  
-	  virtual real_type* getValues(std::string memspace){ return h_val_data_; }
-	  
-	  virtual index_type updateData(index_type* row_data, index_type* col_data, real_type* val_data, std::string memspaceIn, std::string memspaceOut) { return 0; }
-
-	  virtual index_type updateData(index_type* row_data, index_type* col_data, real_type* val_data, index_type new_nnz, std::string memspaceIn, std::string memspaceOut) { return 0; }
-	  
-	  virtual index_type allocateMatrixData(std::string memspace)
-	  {
-        if (memspace == "cpu") {
-          //this->h_row_data_ = new index_type[n_ + 1];
-          //this->h_col_data_ = new index_type[nnz_];
-          this->h_val_data_ = new real_type[nnz_];
-        }
-
-        return 0;
-	  }
-	  
-	  virtual void print(){ }
-	  	  
-	  void set_row(index_type* row_data){ h_row_data_ = row_data; }
-	  void set_col(index_type* col_data){ h_col_data_ = col_data; }
-	  void set_data(real_type* val_data){ h_val_data_ = val_data; }
-
-  };
-}
 
 namespace Ipopt
 {
@@ -164,18 +123,14 @@ private:
    bool factorize_;
    
 
-   klu_symbolic* Symbolic_;
-   klu_numeric* Numeric_;
-   klu_common Common_;
 
    int* Ap_;
    int* Ai_;
    
-   ReSolve::LinSolverDirectKLU* resolve_;
-   ReSolve::MatrixCSRIpOpt* A_;
-   ReSolve::Vector* vec_rhs_;
-   ReSolve::Vector* vec_x_;
-  
+  ReSolve::LinSolverDirectKLU* resolve_KLU_;
+  ReSolve::MatrixCSR* A_;
+  ReSolve::Vector* vec_rhs_;
+  ReSolve::Vector* vec_x_;
 
 };
 

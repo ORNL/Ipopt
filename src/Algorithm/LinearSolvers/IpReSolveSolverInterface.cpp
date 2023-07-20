@@ -10,8 +10,6 @@
 #include <cmath>
 #include <iostream>
 
-#define CLASSIC 0
-
 
 namespace Ipopt
 {
@@ -25,15 +23,13 @@ ReSolveSolverInterface::ReSolveSolverInterface() :
    DBG_START_METH("ReSolveSolverInterface::ReSolveSolverInterface()", dbg_verbosity);
   using index_type = ReSolve::index_type;
   using real_type  = ReSolve::real_type;
-  resolve_ = new ReSolve::LinSolverDirectKLU();
+  resolve_KLU_ = new ReSolve::LinSolverDirectKLU();
 }
 
 ReSolveSolverInterface::~ReSolveSolverInterface()
 {
    DBG_START_METH("ReSolveSolverInterface::~ReSolveSolverInterface()", dbg_verbosity);
    delete[] val_;
-   klu_free_symbolic(&Symbolic_, &Common_);
-   klu_free_numeric(&Numeric_, &Common_);
 }
 
 void ReSolveSolverInterface::RegisterOptions(
@@ -83,34 +79,9 @@ bool ReSolveSolverInterface::InitializeImpl(
 {
    printf("InitializeImpl! --ReSolve. This uses ReSolve Matrix Definitions.\n");
    
-   resolve_->setupParameters(1, 0.1, false);
+   resolve_KLU_->setupParameters(1, 0.1, false);
 
-   klu_defaults(&Common_);
 
-   Number tol;
-   options.GetNumericValue("klu_tol", tol, prefix);
-   Common_.tol = tol;
-   printf("klu_tol: %f\n", Common_.tol);
-
-   Index order_method;
-   options.GetIntegerValue("klu_ordering", order_method, prefix);
-   Common_.ordering = order_method;
-   printf("klu_ordering: %d\n", Common_.ordering);
-
-   Index btf;
-   options.GetIntegerValue("klu_btf", btf, prefix);
-   Common_.btf = btf;
-   printf("klu_btf: %d\n", Common_.btf);
-
-   Index scale;
-   options.GetIntegerValue("klu_scale", scale, prefix);
-   Common_.scale = scale;
-   printf("klu_scale: %d\n", Common_.scale);
-
-   bool halt_if_singular;
-   options.GetBoolValue("klu_halt_if_singular", halt_if_singular, prefix);
-   Common_.halt_if_singular = halt_if_singular;
-   printf("klu_halt_if_singular: %d\n", Common_.halt_if_singular);
 
    return true;
 }
@@ -127,34 +98,47 @@ ESymSolverStatus ReSolveSolverInterface::MultiSolve(
 {
    DBG_START_METH("ReSolveSolverInterface::MultiSolve", dbg_verbosity);
 
-#if 0
+#if 1
    printf("ReSolve MultiSolve Called\n");
 #endif
 
 #if 1
    if(factorize_){
       // perform the factorization
-#if 0
-      printf("klu_factor Called\n");
+#if 1
+      printf("klu_factor Getting Called\n");
 #endif
       if( HaveIpData() )
       {
          IpData().TimingStats().LinearSystemFactorization().Start();
       }
-#if CLASSIC
-      Numeric_ = klu_factor(A_->getRowData("cpu"), A_->getColData("cpu"), A_->getValues("cpu"), Symbolic_, &Common_);
-#else
-	  resolve_->factorize();
-#endif
+      printf("Factorize Steps 1\n");
+	  resolve_KLU_->factorize();
+	  //printf("Factorize Steps 2\n");
+	  //ReSolve::Matrix* L = resolve_KLU_->getLFactor();
+	  //printf("Factorize Steps 3\n");
+      //ReSolve::Matrix* U = resolve_KLU_->getUFactor();
+	  //printf("Factorize Steps 4\n");
+	  //if (L == nullptr) {printf("ERROR");}
+
+      //ReSolve::index_type* P = resolve_KLU_->getPOrdering();
+	  //printf("Factorize Steps 5\n");
+      //ReSolve::index_type* Q = resolve_KLU_->getQOrdering();
+	  //printf("Factorize Steps 6\n");
+      //resolve_GLU_->setup(A_, L, U, P, Q); 
+	  //printf("Factorize Steps 7\n");
+
       if( HaveIpData() )
       {
          IpData().TimingStats().LinearSystemFactorization().End();
       }
+/*
       if( Numeric_ == nullptr )
       {
          DBG_PRINT((1, "FACTORIZATION FAILED!\n"));
          return SYMSOLVER_FATAL_ERROR;  // Matrix singular or error occurred
       }
+*/
       factorize_ = false;
    }
 
@@ -187,11 +171,9 @@ ESymSolverStatus ReSolveSolverInterface::MultiSolve(
       {
          IpData().TimingStats().LinearSystemFactorization().Start();
       }
-#if CLASSIC
-      klu_refactor(A_->getRowData("cpu"), A_->getColData("cpu"), A_->getValues("cpu"), Symbolic_, Numeric_, &Common_);
-#else
-	  resolve_->refactorize();
-#endif
+	  //resolve_KLU_->refactorize();
+	  int status = resolve_KLU_->refactorize();
+      std::cout<<"KLU refactorization status: "<<status<<std::endl;      
       refactorize_ = false;
       if( HaveIpData() )
       {
@@ -204,13 +186,42 @@ ESymSolverStatus ReSolveSolverInterface::MultiSolve(
    {
       IpData().TimingStats().LinearSystemBackSolve().Start();
    }
-#if CLASSIC
-   klu_solve(Symbolic_, Numeric_, ndim_, nrhs, rhs_vals, &Common_);
-#else
-   vec_rhs_->setData(rhs_vals, "cpu");
-   resolve_->solve(vec_rhs_, vec_x_);
+   
+   
+	printf("vec_rhs_[cpu]=%p\n", (void *)vec_rhs_->getData("cpu"));
+	printf("vec_rhs_[cuda]=%p\n", (void *)vec_rhs_->getData("cuda"));
+	printf("vec_x_[cpu]=%p\n", (void *)vec_x_->getData("cpu"));
+	printf("vec_x_[cuda]=%p\n", (void *)vec_x_->getData("cuda"));   
+	printf("rhs_vals=%p\n", (void *)rhs_vals);   
+   
+ 
+   printf("BEFORE: \n");  
+   for(int i=0; i<10; i++){
+        printf("%d=%f\t", i, rhs_vals[i]);
+   }
+   printf("\n");
+   
+
+  //vec_rhs[0] = 1;
+  //vec_rhs[1] = 2;
+   
+   
+   
+   // Copy rhs_vals to vec_rhs cuda
+   vec_rhs_->update(rhs_vals, "cpu", "cpu");
+   int status = resolve_KLU_->solve(vec_rhs_, vec_x_);
+   // Copy vec_x cuda to vec_x
+   std::cout<<"GLU solve status: "<<status<<std::endl;  
+   //vec_x_->update(vec_x_->getData("cuda"), "cuda", "cpu");
+   // copy vec_x to rhs_vals
    std::memcpy(rhs_vals, vec_x_->getData("cpu"), (ndim_) * sizeof(ReSolve::real_type));
-#endif
+
+   printf("AFTER: \n");  
+   for(int i=0; i<10; i++){
+        printf("%d=%f\t", i, rhs_vals[i]);
+   }
+   printf("\n");
+
    if( HaveIpData() )
    {
       IpData().TimingStats().LinearSystemBackSolve().End();
@@ -242,7 +253,7 @@ ESymSolverStatus ReSolveSolverInterface::InitializeStructure(
    DBG_START_METH("ReSolveSolverInterface::InitializeStructure", dbg_verbosity);
 
    ESymSolverStatus retval = SYMSOLVER_SUCCESS;
-   printf("dim: %d\n, nonzeros %d\n", dim, nonzeros);
+   printf("dim: %d, nonzeros %d\n", dim, nonzeros);
 
    // Store size for later use
    ndim_ = dim;
@@ -260,25 +271,28 @@ ESymSolverStatus ReSolveSolverInterface::InitializeStructure(
    Ai_ = const_cast<int*>(ja);
 #endif
 
-  A_ = new ReSolve::MatrixCSRIpOpt(dim, dim, nonzeros);
-  A_->allocateMatrixData("cpu");
-  A_->set_row(const_cast<int*>(ia));
-  A_->set_col(const_cast<int*>(ja));
+  A_ = new ReSolve::MatrixCSR(dim, dim, nonzeros);
+   if( val_ != NULL )
+   {
+      delete[] val_;
+   }
+   val_ = new Number[nonzeros];
+   
+  A_->setMatrixData(const_cast<int*>(ia), const_cast<int*>(ja), val_, "cpu");
   
-  resolve_->setup(A_);
+  resolve_KLU_->setup(A_);
   
   vec_rhs_ = new ReSolve::Vector(A_->getNumRows());
   vec_x_ = new ReSolve::Vector(A_->getNumRows());
+  
+  vec_x_->allocate("cpu");//for KLU
+  vec_x_->allocate("cuda");
   
    if( HaveIpData() )
    {
       IpData().TimingStats().LinearSystemSymbolicFactorization().Start();
    }
-#if CLASSIC
-   Symbolic_ = klu_analyze(ndim_, A_->getRowData("cpu"), A_->getColData("cpu"), &Common_);
-#else
-   resolve_->analyze();
-#endif
+   resolve_KLU_->analyze();
    if( HaveIpData() )
    {
       IpData().TimingStats().LinearSystemSymbolicFactorization().End();
@@ -287,38 +301,12 @@ ESymSolverStatus ReSolveSolverInterface::InitializeStructure(
    
    factorize_ = true;
 
+/*
    if (Symbolic_ == nullptr){
       printf("Symbolic_ factorization crashed with Common_.status = %d \n", Common_.status);
       return SYMSOLVER_FATAL_ERROR;
    }
-
-#if 0
-   printf("dim: %d\n, nonzeros %d\n", dim, nonzeros);
-
-   for(int i=1; i<=dim; i++){
-      printf("ia[%d]=(%d)\n", i, ia[i]);
-   }
-
-   for(int i=0; i< nonzeros; i++){
-      printf("ja[%d]=(%d)\n", i, ja[i]);
-   }
-
-   for(int i=0; i<dim; i++){
-      int n = ia[i+1] - ia[i];
-	  printf("%3d -- %3d:\t", i, n);
-      for(int j=0; j<n; j++){
-         printf("[%3d]=%3d\t", ia[i]+j, ja[ia[i]+j]);
-      }
-      printf("\n------------------------------------\n");
-   }
-#endif
-   // Setup memory for values
-   if( val_ != NULL )
-   {
-      delete[] val_;
-   }
-   val_ = new Number[nonzeros];
-
+*/
    initialized_ = true;
 
    return retval;
