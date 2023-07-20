@@ -24,6 +24,9 @@ ReSolveSolverInterface::ReSolveSolverInterface() :
   using index_type = ReSolve::index_type;
   using real_type  = ReSolve::real_type;
   resolve_KLU_ = new ReSolve::LinSolverDirectKLU();
+  workspace_CUDA_ = new ReSolve::LinAlgWorkspaceCUDA();
+  workspace_CUDA_->initializeHandles();
+  resolve_GLU_ = new ReSolve::LinSolverDirectCuSolverGLU(workspace_CUDA_);
 }
 
 ReSolveSolverInterface::~ReSolveSolverInterface()
@@ -127,7 +130,20 @@ ESymSolverStatus ReSolveSolverInterface::MultiSolve(
          IpData().TimingStats().LinearSystemFactorization().Start();
       }
       printf("Factorize Steps 1\n");
-	  int status  = resolve_KLU_->factorize();
+	  int status = resolve_KLU_->factorize();
+	  printf("Factorize Steps 2\n");
+	  ReSolve::Matrix* L = resolve_KLU_->getLFactor();
+	  printf("Factorize Steps 3\n");
+      ReSolve::Matrix* U = resolve_KLU_->getUFactor();
+	  printf("Factorize Steps 4\n");
+	  if (L == nullptr) {printf("ERROR");}
+
+      ReSolve::index_type* P = resolve_KLU_->getPOrdering();
+	  printf("Factorize Steps 5\n");
+      ReSolve::index_type* Q = resolve_KLU_->getQOrdering();
+	  printf("Factorize Steps 6\n");
+      resolve_GLU_->setup(A_, L, U, P, Q); 
+	  printf("Factorize Steps 7\n");
 
       if( HaveIpData() )
       {
@@ -169,8 +185,8 @@ ESymSolverStatus ReSolveSolverInterface::MultiSolve(
          IpData().TimingStats().LinearSystemFactorization().Start();
       }
 	  //resolve_KLU_->refactorize();
-	  int status = resolve_KLU_->refactorize();
-      std::cout<<"KLU refactorization status: "<<status<<std::endl;      
+	  int status = resolve_GLU_->refactorize();
+      std::cout<<"CUSOLVER GLU refactorization status: "<<status<<std::endl;      
       refactorize_ = false;
       if( HaveIpData() )
       {
@@ -186,10 +202,11 @@ ESymSolverStatus ReSolveSolverInterface::MultiSolve(
    
 
    // Copy rhs_vals to vec_rhs cuda
-   vec_rhs_->update(rhs_vals, "cpu", "cpu");
-   int status = resolve_KLU_->solve(vec_rhs_, vec_x_);
+   vec_rhs_->update(rhs_vals, "cpu", "cuda");
+   int status = resolve_GLU_->solve(vec_rhs_, vec_x_);
    // Copy vec_x cuda to vec_x
-   std::cout<<"KLU solve status: "<<status<<std::endl;  
+   std::cout<<"GLU solve status: "<<status<<std::endl;  
+   vec_x_->update(vec_x_->getData("cuda"), "cuda", "cpu");
    // copy vec_x to rhs_vals
    std::memcpy(rhs_vals, vec_x_->getData("cpu"), (ndim_) * sizeof(ReSolve::real_type));
 

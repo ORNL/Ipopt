@@ -130,6 +130,8 @@ private:
   ReSolve::MatrixCSR* A_;
   ReSolve::Vector* vec_rhs_;
   ReSolve::Vector* vec_x_;
+  ReSolve::LinAlgWorkspaceCUDA* workspace_CUDA_ = new ReSolve::LinAlgWorkspaceCUDA;
+  ReSolve::LinSolverDirectCuSolverGLU* resolve_GLU_;
 
 };
 
