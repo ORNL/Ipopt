@@ -12,9 +12,6 @@
 
 #include "IpMa27TSolverInterface.hpp"
 #include "IpMa57TSolverInterface.hpp"
-#ifdef IPOPT_HAS_KLU
-# include "IpKLUSolverInterface.hpp"
-#endif
 #include "IpMa77SolverInterface.hpp"
 #include "IpMa86SolverInterface.hpp"
 #include "IpMa97SolverInterface.hpp"
@@ -32,6 +29,12 @@
 #ifdef IPOPT_HAS_WSMP
 # include "IpWsmpSolverInterface.hpp"
 # include "IpIterativeWsmpSolverInterface.hpp"
+#endif
+#ifdef IPOPT_HAS_KLU
+# include "IpKLUSolverInterface.hpp"
+#endif
+#ifdef IPOPT_HAS_RESOLVE
+# include "IpReSolveSolverInterface.hpp"
 #endif
 
 namespace Ipopt
@@ -107,6 +110,14 @@ void RegisterOptions_LinearSolvers(
    {
       roptions->SetRegisteringCategory("KLU Linear Solver");
       KLUSolverInterface::RegisterOptions(roptions);
+   }
+#endif
+
+#ifdef IPOPT_HAS_RESOLVE
+   if( availablesolvers & IPOPTLINEARSOLVER_RESOLVE )
+   {
+      roptions->SetRegisteringCategory("ReSolve Linear Solver");
+      ReSolveSolverInterface::RegisterOptions(roptions);
    }
 #endif
 

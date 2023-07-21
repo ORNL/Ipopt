@@ -25,7 +25,6 @@
 #include "IpLibraryLoader.hpp"
 #include "IpSparseSymLinearSolverInterface.hpp"
 #include "IpTypes.h"
-#include "klu.h"
 
 namespace Ipopt
 {
