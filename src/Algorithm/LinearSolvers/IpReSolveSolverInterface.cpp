@@ -5,13 +5,10 @@
 // Authors:  Slaven Peles, Maksudul Alam
 
 #include "IpReSolveSolverInterface.hpp"
+#include "IpoptConfig.h"
 
 #include <cmath>
 #include <iostream>
-
-#include "IpoptConfig.h"
-
-#define USE_GLU 1
 
 namespace Ipopt
 {
@@ -19,48 +16,55 @@ namespace Ipopt
 static const Index dbg_verbosity = 0;
 #endif
 
-ReSolveSolverInterface::ReSolveSolverInterface() : val_(NULL)
+ReSolveSolverInterface::ReSolveSolverInterface() : _val(NULL)
 {
     DBG_START_METH("ReSolveSolverInterface::ReSolveSolverInterface()", dbg_verbosity);
-    resolve_KLU_ = new ReSolve::LinSolverDirectKLU();
-#if USE_GLU
-    workspace_CUDA_ = new ReSolve::LinAlgWorkspaceCUDA();
-    workspace_CUDA_->initializeHandles();
-    resolve_GLU_ = new ReSolve::LinSolverDirectCuSolverGLU(workspace_CUDA_);
-#endif
 }
 
 ReSolveSolverInterface::~ReSolveSolverInterface()
 {
     DBG_START_METH("ReSolveSolverInterface::~ReSolveSolverInterface()", dbg_verbosity);
-    delete[] val_;
+    delete[] _val;
 }
 
 void ReSolveSolverInterface::RegisterOptions(SmartPtr<RegisteredOptions> roptions)
 {
-    roptions->AddNumberOption("resolve_tol", "Partial pivoting tolerance", 0.001,
+
+    roptions->AddBoolOption("resolve_use_glu", //
+                            "Use GLU",         //
+                            true,              //
+                            "If the diagonal entry has a magnitude greater than or equal to tol times the largest "
+                            "magnitude of entries in the pivot column, then the diagonal entry is chosen.",
+                            false);
+
+    roptions->AddNumberOption("resolve_tol",                //
+                              "Partial pivoting tolerance", //
+                              0.1,                          // Default is 0.1 in ReSolve
                               "If the diagonal entry has a magnitude greater than or equal to tol times the largest "
                               "magnitude of entries in the pivot column, then the diagonal entry is chosen.",
                               false);
 
-    roptions->AddIntegerOption("resolve_ordering", "Which fill-reducing ordering to use", 0,
+    roptions->AddIntegerOption("resolve_ordering",                    //
+                               "Which fill-reducing ordering to use", //
+                               1,                                     // Default is 1 in ReSolve
                                "0 for AMD, 1 for COLAMD, 2 for a user-provided permutation P and Q (or a natural "
                                "ordering if P and Q are NULL), or 3 for the user order function.",
                                false);
 
-    roptions->AddIntegerOption(
-        "resolve_btf", "Use BTF", 1,
-        "if nonzero, then BTF is used to permute the input matrix into block upper triangular form.", false);
+    // roptions->AddIntegerOption(
+    //     "resolve_btf", "Use BTF", 1,
+    //     "if nonzero, then BTF is used to permute the input matrix into block upper triangular form.", false);
 
-    roptions->AddIntegerOption(
-        "resolve_scale", "Whether or not the matrix should be scaled", 2,
-        "If scale < 0, then no scaling is performed and the input matrix is not checked for errors. If scale >= 0, the "
-        "input matrix is check for errors. If scale=0, then no scaling is performed. If scale=1, then each row of A is "
-        "divided by the sum of the absolute values in that row. If scale=2, then each row of A is divided by the "
-        "maximum absolute value in that row. Default: 2.",
-        false);
+    // roptions->AddIntegerOption(
+    //     "resolve_scale", "Whether or not the matrix should be scaled", 2,
+    //     "If scale < 0, then no scaling is performed and the input matrix is not checked for errors. If scale >= 0,
+    //     the " "input matrix is check for errors. If scale=0, then no scaling is performed. If scale=1, then each row
+    //     of A is " "divided by the sum of the absolute values in that row. If scale=2, then each row of A is divided
+    //     by the " "maximum absolute value in that row. Default: 2.", false);
 
-    roptions->AddBoolOption("resolve_halt_if_singular", "how to handle a singular matrix", false,
+    roptions->AddBoolOption("resolve_halt_if_singular",        //
+                            "how to handle a singular matrix", //
+                            false,                             // Default is False in ReSolve
                             "FALSE: keep going, TRUE: stop quickly.", false);
 }
 
@@ -72,16 +76,28 @@ bool ReSolveSolverInterface::InitializeImpl(const OptionsList &options, const st
     Index order_method;
     options.GetIntegerValue("resolve_ordering", order_method, prefix);
 
-    Index btf;
-    options.GetIntegerValue("resolve_btf", btf, prefix);
+    // Index btf;
+    // options.GetIntegerValue("resolve_btf", btf, prefix);
 
-    Index scale;
-    options.GetIntegerValue("resolve_scale", scale, prefix);
+    // Index scale;
+    // options.GetIntegerValue("resolve_scale", scale, prefix);
 
     bool halt_if_singular;
     options.GetBoolValue("resolve_halt_if_singular", halt_if_singular, prefix);
-   
-    resolve_KLU_->setupParameters(1, 0.1, false);
+
+    bool use_glu;
+    options.GetBoolValue("resolve_use_glu", use_glu, prefix);
+    _use_glu = use_glu;
+
+    _resolve_KLU = new ReSolve::LinSolverDirectKLU();
+    _resolve_KLU->setupParameters(order_method, tol, halt_if_singular);
+
+    if (_use_glu)
+    {
+        _workspace_CUDA = new ReSolve::LinAlgWorkspaceCUDA();
+        _workspace_CUDA->initializeHandles();
+        _resolve_GLU = new ReSolve::LinSolverDirectCuSolverGLU(_workspace_CUDA);
+    }
 
     return true;
 }
@@ -91,35 +107,28 @@ ESymSolverStatus ReSolveSolverInterface::MultiSolve(bool new_matrix, const Index
 {
     DBG_START_METH("ReSolveSolverInterface::MultiSolve", dbg_verbosity);
 
-    A_->updateData(A_->getRowData("cpu"), A_->getColData("cpu"), A_->getValues("cpu"), "cpu", "cuda");
+    _A->updateData(_A->getRowData("cpu"), _A->getColData("cpu"), _A->getValues("cpu"), "cpu", "cuda");
 
-    if (factorize_)
+    if (_factorize)
     {
         // perform the factorization
         if (HaveIpData())
         {
             IpData().TimingStats().LinearSystemFactorization().Start();
         }
-        printf("Factorize Steps 1\n");
-        int status = resolve_KLU_->factorize();
-#if USE_GLU
-        printf("Factorize Steps 2\n");
-        ReSolve::Matrix *L = resolve_KLU_->getLFactor();
-        printf("Factorize Steps 3\n");
-        ReSolve::Matrix *U = resolve_KLU_->getUFactor();
-        printf("Factorize Steps 4\n");
-        if (L == nullptr)
+        int status = _resolve_KLU->factorize();
+        if (_use_glu)
         {
-            printf("ERROR");
+            ReSolve::Matrix *L = _resolve_KLU->getLFactor();
+            ReSolve::Matrix *U = _resolve_KLU->getUFactor();
+            if (L == nullptr)
+            {
+                printf("ERROR");
+            }
+            ReSolve::index_type *P = _resolve_KLU->getPOrdering();
+            ReSolve::index_type *Q = _resolve_KLU->getQOrdering();
+            _resolve_GLU->setup(_A, L, U, P, Q);
         }
-
-        ReSolve::index_type *P = resolve_KLU_->getPOrdering();
-        printf("Factorize Steps 5\n");
-        ReSolve::index_type *Q = resolve_KLU_->getQOrdering();
-        printf("Factorize Steps 6\n");
-        resolve_GLU_->setup(A_, L, U, P, Q);
-        printf("Factorize Steps 7\n");
-#endif
 
         if (HaveIpData())
         {
@@ -132,41 +141,50 @@ ESymSolverStatus ReSolveSolverInterface::MultiSolve(bool new_matrix, const Index
             return SYMSOLVER_FATAL_ERROR; // Matrix singular or error occurred
         }
 
-        factorize_ = false;
+        _factorize = false;
     }
 
-    if (pivtol_changed_)
+    if (_pivtol_changed)
     {
         DBG_PRINT((1, "Pivot tolerance has changed.\n"));
-        pivtol_changed_ = false;
+        _pivtol_changed = false;
         // If the pivot tolerance has been changed but the matrix is not
         // new, we have to request the values for the matrix again to do
         // the factorization again.
         if (!new_matrix)
         {
             DBG_PRINT((1, "Ask caller to call again.\n"));
-            refactorize_ = true;
+            _re_factorize = true;
             return SYMSOLVER_CALL_AGAIN;
         }
     }
 
     // check if a factorization has to be done
     DBG_PRINT((1, "new_matrix = %d\n", new_matrix));
-    if (!first_iteration_ && (new_matrix || refactorize_))
+    if (!_first_iteration && (new_matrix || _re_factorize))
     {
         // perform the factorization
         if (HaveIpData())
         {
             IpData().TimingStats().LinearSystemFactorization().Start();
         }
-#if USE_GLU
-        int status = resolve_GLU_->refactorize();
-        std::cout << "CUSOLVER GLU refactorization status: " << status << std::endl;
-#else
-        int status = resolve_KLU_->refactorize();
-        std::cout << "KLU refactorization status: " << status << std::endl;
-#endif
-        refactorize_ = false;
+        if (_use_glu)
+        {
+            int status = _resolve_GLU->refactorize();
+            if (status != 0)
+            {
+                std::cout << "CUSOLVER GLU refactorization status: " << status << std::endl;
+            }
+        }
+        else
+        {
+            int status = _resolve_KLU->refactorize();
+            if (status != 0)
+            {
+                std::cout << "KLU refactorization status: " << status << std::endl;
+            }
+        }
+        _re_factorize = false;
         if (HaveIpData())
         {
             IpData().TimingStats().LinearSystemFactorization().End();
@@ -178,29 +196,37 @@ ESymSolverStatus ReSolveSolverInterface::MultiSolve(bool new_matrix, const Index
         IpData().TimingStats().LinearSystemBackSolve().Start();
     }
 
-#if USE_GLU
-    // Copy rhs_vals to vec_rhs cuda
-    vec_rhs_->update(rhs_vals, "cpu", "cuda");
-    int status = resolve_GLU_->solve(vec_rhs_, vec_x_);
-    // Copy vec_x cuda to vec_x
-    std::cout << "GLU solve status: " << status << std::endl;
-    vec_x_->update(vec_x_->getData("cuda"), "cuda", "cpu");
-#else
-    // Copy rhs_vals to vec_rhs cuda
-    vec_rhs_->update(rhs_vals, "cpu", "cpu");
-    int status = resolve_KLU_->solve(vec_rhs_, vec_x_);
-    // Copy vec_x cuda to vec_x
-    std::cout << "KLU solve status: " << status << std::endl;
-#endif
+    if (_use_glu)
+    {
+        // Copy rhs_vals to vec_rhs cuda
+        _vec_rhs->update(rhs_vals, "cpu", "cuda");
+        int status = _resolve_GLU->solve(_vec_rhs, _vec_x);
+        if (status != 0)
+        {
+            std::cout << "GLU solve status: " << status << std::endl;
+        }
+        // Copy vec_x cuda to vec_x in cpu
+        _vec_x->update(_vec_x->getData("cuda"), "cuda", "cpu");
+    }
+    else
+    {
+        // Copy rhs_vals to vec_rhs cuda
+        _vec_rhs->update(rhs_vals, "cpu", "cpu");
+        int status = _resolve_KLU->solve(_vec_rhs, _vec_x);
+        if (status != 0)
+        {
+            std::cout << "KLU solve status: " << status << std::endl;
+        }
+    }
     // copy vec_x to rhs_vals
-    std::memcpy(rhs_vals, vec_x_->getData("cpu"), (ndim_) * sizeof(ReSolve::real_type));
+    std::memcpy(rhs_vals, _vec_x->getData("cpu"), (_ndim) * sizeof(ReSolve::real_type));
 
     if (HaveIpData())
     {
         IpData().TimingStats().LinearSystemBackSolve().End();
     }
 
-    first_iteration_ = false;
+    _first_iteration = false;
 
     return SYMSOLVER_SUCCESS;
 }
@@ -208,9 +234,9 @@ ESymSolverStatus ReSolveSolverInterface::MultiSolve(bool new_matrix, const Index
 Number *ReSolveSolverInterface::GetValuesArrayPtr()
 {
     DBG_START_METH("ReSolveSolverInterface::GetValuesArrayPtr", dbg_verbosity);
-    DBG_ASSERT(initialized_);
+    DBG_ASSERT(_initialized);
 
-    return A_->getValues("cpu");
+    return _A->getValues("cpu");
 }
 
 /** Initialize the local copy of the positions of the nonzero elements */
@@ -223,38 +249,38 @@ ESymSolverStatus ReSolveSolverInterface::InitializeStructure(Index dim, Index no
     printf("dim: %d, nonzeros %d\n", dim, nonzeros);
 
     // Store size for later use
-    ndim_ = dim;
-    nonzeros_ = nonzeros;
+    _ndim = dim;
+    _nonzeros = nonzeros;
 
-    A_ = new ReSolve::MatrixCSR(dim, dim, nonzeros);
-    if (val_ != NULL)
+    _A = new ReSolve::MatrixCSR(dim, dim, nonzeros);
+    if (_val != NULL)
     {
-        delete[] val_;
+        delete[] _val;
     }
-    val_ = new Number[nonzeros];
+    _val = new Number[nonzeros];
 
-    A_->setMatrixData(const_cast<int *>(ia), const_cast<int *>(ja), val_, "cpu");
+    _A->setMatrixData(const_cast<int *>(ia), const_cast<int *>(ja), _val, "cpu");
 
-    resolve_KLU_->setup(A_);
+    _resolve_KLU->setup(_A);
 
-    vec_rhs_ = new ReSolve::Vector(A_->getNumRows());
-    vec_x_ = new ReSolve::Vector(A_->getNumRows());
+    _vec_rhs = new ReSolve::Vector(_A->getNumRows());
+    _vec_x = new ReSolve::Vector(_A->getNumRows());
 
-    vec_x_->allocate("cpu"); // for KLU
-    vec_x_->allocate("cuda");
+    _vec_x->allocate("cpu"); // for KLU
+    _vec_x->allocate("cuda");
 
     if (HaveIpData())
     {
         IpData().TimingStats().LinearSystemSymbolicFactorization().Start();
     }
-    int status = resolve_KLU_->analyze();
+    int status = _resolve_KLU->analyze();
     if (HaveIpData())
     {
         IpData().TimingStats().LinearSystemSymbolicFactorization().End();
     }
 
-    factorize_ = true;
-    first_iteration_ = true;
+    _factorize = true;
+    _first_iteration = true;
 
     if (status != 0)
     {
@@ -262,14 +288,14 @@ ESymSolverStatus ReSolveSolverInterface::InitializeStructure(Index dim, Index no
         return SYMSOLVER_FATAL_ERROR;
     }
 
-    initialized_ = true;
+    _initialized = true;
 
     return retval;
 }
 
 Index ReSolveSolverInterface::NumberOfNegEVals() const
 {
-    return numneg_;
+    return _numneg;
 }
 
 bool ReSolveSolverInterface::IncreaseQuality()

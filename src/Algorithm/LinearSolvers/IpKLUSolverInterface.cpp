@@ -16,7 +16,7 @@ namespace Ipopt
 static const Index dbg_verbosity = 0;
 #endif
 
-KLUSolverInterface::KLUSolverInterface() : val_(NULL)
+KLUSolverInterface::KLUSolverInterface() : _val(NULL)
 {
     DBG_START_METH("KLUSolverInterface::KLUSolverInterface()", dbg_verbosity);
 }
@@ -24,67 +24,78 @@ KLUSolverInterface::KLUSolverInterface() : val_(NULL)
 KLUSolverInterface::~KLUSolverInterface()
 {
     DBG_START_METH("KLUSolverInterface::~KLUSolverInterface()", dbg_verbosity);
-    delete[] val_;
-    klu_free_symbolic(&Symbolic_, &Common_);
-    klu_free_numeric(&Numeric_, &Common_);
+    delete[] _val;
+    klu_free_symbolic(&_Symbolic, &_Common);
+    klu_free_numeric(&_Numeric, &_Common);
 }
 
 void KLUSolverInterface::RegisterOptions(SmartPtr<RegisteredOptions> roptions)
 {
-    roptions->AddNumberOption("klu_tol", "Partial pivoting tolerance", 0.001,
+    roptions->AddNumberOption("klu_tol",                    //
+                              "Partial pivoting tolerance", //
+                              0.001,                        //
                               "If the diagonal entry has a magnitude greater than or equal to tol times the largest "
                               "magnitude of entries in the pivot column, then the diagonal entry is chosen.",
                               false);
 
-    roptions->AddIntegerOption("klu_ordering", "Which fill-reducing ordering to use", 0,
+    roptions->AddIntegerOption("klu_ordering",                        //
+                               "Which fill-reducing ordering to use", //
+                               0,                                     //
                                "0 for AMD, 1 for COLAMD, 2 for a user-provided permutation P and Q (or a natural "
                                "ordering if P and Q are NULL), or 3 for the user order function.",
                                false);
 
     roptions->AddIntegerOption(
-        "klu_btf", "Use BTF", 1,
-        "if nonzero, then BTF is used to permute the input matrix into block upper triangular form.", false);
+        "klu_btf",                                                                                    //
+        "Use BTF",                                                                                    //
+        1,                                                                                            //
+        "if nonzero, then BTF is used to permute the input matrix into block upper triangular form.", //
+        false);
 
     roptions->AddIntegerOption(
-        "klu_scale", "Whether or not the matrix should be scaled", 2,
+        "klu_scale",                                  //
+        "Whether or not the matrix should be scaled", //
+        2,                                            //
         "If scale < 0, then no scaling is performed and the input matrix is not checked for errors. If scale >= 0, the "
         "input matrix is check for errors. If scale=0, then no scaling is performed. If scale=1, then each row of A is "
         "divided by the sum of the absolute values in that row. If scale=2, then each row of A is divided by the "
         "maximum absolute value in that row. Default: 2.",
         false);
 
-    roptions->AddBoolOption("klu_halt_if_singular", "how to handle a singular matrix", false,
+    roptions->AddBoolOption("klu_halt_if_singular",            //
+                            "how to handle a singular matrix", //
+                            false,                             //
                             "FALSE: keep going, TRUE: stop quickly.", false);
 }
 
 bool KLUSolverInterface::InitializeImpl(const OptionsList &options, const std::string &prefix)
 {
-    klu_defaults(&Common_);
+    klu_defaults(&_Common);
 
     Number tol;
     options.GetNumericValue("klu_tol", tol, prefix);
-    Common_.tol = tol;
-    printf("klu_tol: %f\n", Common_.tol);
+    _Common.tol = tol;
+    // printf("klu_tol: %f\n", _Common.tol);
 
     Index order_method;
     options.GetIntegerValue("klu_ordering", order_method, prefix);
-    Common_.ordering = order_method;
-    printf("klu_ordering: %d\n", Common_.ordering);
+    _Common.ordering = order_method;
+    // printf("klu_ordering: %d\n", _Common.ordering);
 
     Index btf;
     options.GetIntegerValue("klu_btf", btf, prefix);
-    Common_.btf = btf;
-    printf("klu_btf: %d\n", Common_.btf);
+    _Common.btf = btf;
+    // printf("klu_btf: %d\n", _Common.btf);
 
     Index scale;
     options.GetIntegerValue("klu_scale", scale, prefix);
-    Common_.scale = scale;
-    printf("klu_scale: %d\n", Common_.scale);
+    _Common.scale = scale;
+    // printf("klu_scale: %d\n", _Common.scale);
 
     bool halt_if_singular;
     options.GetBoolValue("klu_halt_if_singular", halt_if_singular, prefix);
-    Common_.halt_if_singular = halt_if_singular;
-    printf("klu_halt_if_singular: %d\n", Common_.halt_if_singular);
+    _Common.halt_if_singular = halt_if_singular;
+    // printf("klu_halt_if_singular: %d\n", _Common.halt_if_singular);
 
     return true;
 }
@@ -94,52 +105,52 @@ ESymSolverStatus KLUSolverInterface::MultiSolve(bool new_matrix, const Index *ia
 {
     DBG_START_METH("KLUSolverInterface::MultiSolve", dbg_verbosity);
 
-    if (factorize_)
+    if (_factorize)
     {
         // perform the factorization
         if (HaveIpData())
         {
             IpData().TimingStats().LinearSystemFactorization().Start();
         }
-        Numeric_ = klu_factor(Ap_, Ai_, val_, Symbolic_, &Common_);
+        _Numeric = klu_factor(_Ai, _Aj, _val, _Symbolic, &_Common);
         if (HaveIpData())
         {
             IpData().TimingStats().LinearSystemFactorization().End();
         }
-        if (Numeric_ == nullptr)
+        if (_Numeric == nullptr)
         {
             DBG_PRINT((1, "FACTORIZATION FAILED!\n"));
             return SYMSOLVER_FATAL_ERROR; // Matrix singular or error occurred
         }
-        factorize_ = false;
+        _factorize = false;
     }
 
-    if (pivtol_changed_)
+    if (_pivtol_changed)
     {
         DBG_PRINT((1, "Pivot tolerance has changed.\n"));
-        pivtol_changed_ = false;
+        _pivtol_changed = false;
         // If the pivot tolerance has been changed but the matrix is not
         // new, we have to request the values for the matrix again to do
         // the factorization again.
         if (!new_matrix)
         {
             DBG_PRINT((1, "Ask caller to call again.\n"));
-            refactorize_ = true;
+            _re_factorize = true;
             return SYMSOLVER_CALL_AGAIN;
         }
     }
 
     // check if a factorization has to be done
     DBG_PRINT((1, "new_matrix = %d\n", new_matrix));
-    if (!first_iteration_ && (new_matrix || refactorize_))
+    if (!_first_iteration && (new_matrix || _re_factorize))
     {
         // perform the factorization
         if (HaveIpData())
         {
             IpData().TimingStats().LinearSystemFactorization().Start();
         }
-        klu_refactor(Ap_, Ai_, val_, Symbolic_, Numeric_, &Common_);
-        refactorize_ = false;
+        klu_refactor(_Ai, _Aj, _val, _Symbolic, _Numeric, &_Common);
+        _re_factorize = false;
         if (HaveIpData())
         {
             IpData().TimingStats().LinearSystemFactorization().End();
@@ -151,14 +162,14 @@ ESymSolverStatus KLUSolverInterface::MultiSolve(bool new_matrix, const Index *ia
         IpData().TimingStats().LinearSystemBackSolve().Start();
     }
 
-    klu_solve(Symbolic_, Numeric_, ndim_, nrhs, rhs_vals, &Common_);
+    klu_solve(_Symbolic, _Numeric, _ndim, nrhs, rhs_vals, &_Common);
 
     if (HaveIpData())
     {
         IpData().TimingStats().LinearSystemBackSolve().End();
     }
 
-    first_iteration_ = false;
+    _first_iteration = false;
 
     return SYMSOLVER_SUCCESS;
 }
@@ -166,9 +177,9 @@ ESymSolverStatus KLUSolverInterface::MultiSolve(bool new_matrix, const Index *ia
 Number *KLUSolverInterface::GetValuesArrayPtr()
 {
     DBG_START_METH("KLUSolverInterface::GetValuesArrayPtr", dbg_verbosity);
-    DBG_ASSERT(initialized_);
+    DBG_ASSERT(_initialized);
 
-    return val_;
+    return _val;
 }
 
 /** Initialize the local copy of the positions of the nonzero elements */
@@ -180,45 +191,45 @@ ESymSolverStatus KLUSolverInterface::InitializeStructure(Index dim, Index nonzer
     printf("dim: %d, nonzeros %d\n", dim, nonzeros);
 
     // Store size for later use
-    ndim_ = dim;
-    nonzeros_ = nonzeros;
+    _ndim = dim;
+    _nonzeros = nonzeros;
 
-    Ap_ = const_cast<int *>(ia);
-    Ai_ = const_cast<int *>(ja);
+    _Ai = const_cast<int *>(ia);
+    _Aj = const_cast<int *>(ja);
     // Setup memory for values
-    if (val_ != NULL)
+    if (_val != NULL)
     {
-        delete[] val_;
+        delete[] _val;
     }
-    val_ = new Number[nonzeros];
+    _val = new Number[nonzeros];
 
     if (HaveIpData())
     {
         IpData().TimingStats().LinearSystemSymbolicFactorization().Start();
     }
-    Symbolic_ = klu_analyze(ndim_, Ap_, Ai_, &Common_);
+    _Symbolic = klu_analyze(_ndim, _Ai, _Aj, &_Common);
     if (HaveIpData())
     {
         IpData().TimingStats().LinearSystemSymbolicFactorization().End();
     }
 
-    factorize_ = true;
-    first_iteration_ = true;
+    _factorize = true;
+    _first_iteration = true;
 
-    if (Symbolic_ == nullptr)
+    if (_Symbolic == nullptr)
     {
-        printf("Symbolic_ factorization crashed with Common_.status = %d \n", Common_.status);
+        printf("Symbolic_ factorization crashed with Common_.status = %d \n", _Common.status);
         return SYMSOLVER_FATAL_ERROR;
     }
 
-    initialized_ = true;
+    _initialized = true;
 
     return retval;
 }
 
 Index KLUSolverInterface::NumberOfNegEVals() const
 {
-    return numneg_;
+    return _numneg;
 }
 
 bool KLUSolverInterface::IncreaseQuality()
