@@ -5,13 +5,11 @@
 // Authors:  Slaven Peles, Maksudul Alam
 
 #include "IpReSolveSolverInterface.hpp"
-#include "IpoptConfig.h"
 
 #include <cmath>
 #include <iostream>
 
 #include "IpoptConfig.h"
-
 
 #define USE_GLU 1
 
@@ -24,8 +22,6 @@ static const Index dbg_verbosity = 0;
 ReSolveSolverInterface::ReSolveSolverInterface() : val_(NULL)
 {
     DBG_START_METH("ReSolveSolverInterface::ReSolveSolverInterface()", dbg_verbosity);
-    using index_type = ReSolve::index_type;
-    using real_type = ReSolve::real_type;
     resolve_KLU_ = new ReSolve::LinSolverDirectKLU();
 #if USE_GLU
     workspace_CUDA_ = new ReSolve::LinAlgWorkspaceCUDA();
@@ -59,19 +55,11 @@ ESymSolverStatus ReSolveSolverInterface::MultiSolve(bool new_matrix, const Index
 {
     DBG_START_METH("ReSolveSolverInterface::MultiSolve", dbg_verbosity);
 
-#if 1
-    printf("ReSolve MultiSolve Called\n");
-#endif
-
     A_->updateData(A_->getRowData("cpu"), A_->getColData("cpu"), A_->getValues("cpu"), "cpu", "cuda");
 
-#if 1
     if (factorize_)
     {
-// perform the factorization
-#if 1
-        printf("Factorize is Getting Called\n");
-#endif
+        // perform the factorization
         if (HaveIpData())
         {
             IpData().TimingStats().LinearSystemFactorization().Start();
@@ -125,7 +113,6 @@ ESymSolverStatus ReSolveSolverInterface::MultiSolve(bool new_matrix, const Index
             return SYMSOLVER_CALL_AGAIN;
         }
     }
-#endif
 
     // check if a factorization has to be done
     DBG_PRINT((1, "new_matrix = %d\n", new_matrix));
@@ -155,11 +142,6 @@ ESymSolverStatus ReSolveSolverInterface::MultiSolve(bool new_matrix, const Index
         IpData().TimingStats().LinearSystemBackSolve().Start();
     }
 
-    printf("Printing Matrix\n");
-
-    write_CSR_matrix_rhs(A_->getRowData("cpu"), A_->getColData("cpu"), A_->getValues("cpu"), rhs_vals, ndim_, nonzeros_, "RESOLVE",
-                         seq);
-
 #if USE_GLU
     // Copy rhs_vals to vec_rhs cuda
     vec_rhs_->update(rhs_vals, "cpu", "cuda");
@@ -174,8 +156,6 @@ ESymSolverStatus ReSolveSolverInterface::MultiSolve(bool new_matrix, const Index
     // Copy vec_x cuda to vec_x
     std::cout << "KLU solve status: " << status << std::endl;
 #endif
-    write_x(vec_x_->getData("cpu"), ndim_, "RESOLVE", seq);
-    seq++;
     // copy vec_x to rhs_vals
     std::memcpy(rhs_vals, vec_x_->getData("cpu"), (ndim_) * sizeof(ReSolve::real_type));
 
@@ -183,10 +163,6 @@ ESymSolverStatus ReSolveSolverInterface::MultiSolve(bool new_matrix, const Index
     {
         IpData().TimingStats().LinearSystemBackSolve().End();
     }
-
-#if 0
-   printf("ReSolve Solve Done\n");
-#endif
 
     first_iteration_ = false;
 
@@ -240,7 +216,6 @@ ESymSolverStatus ReSolveSolverInterface::InitializeStructure(Index dim, Index no
     {
         IpData().TimingStats().LinearSystemSymbolicFactorization().End();
     }
-    printf("ReSolve - Symbolic Factorization Done\n");
 
     factorize_ = true;
     first_iteration_ = true;
