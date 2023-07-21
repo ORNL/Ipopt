@@ -7,14 +7,14 @@
 #ifndef __IPKLUSOLVERINTERFACE_HPP__
 #define __IPKLUSOLVERINTERFACE_HPP__
 
+#include "IpLibraryLoader.hpp"
+#include "IpSparseSymLinearSolverInterface.hpp"
+#include "IpTypes.h"
 #include <fstream>
 #include <iomanip>
 #include <iostream>
-#include "IpLibraryLoader.hpp"
-#include "IpSparseSymLinearSolverInterface.hpp"
 #include <sstream>
 #include <string>
-#include "IpTypes.h"
 
 #include "klu.h"
 namespace Ipopt
@@ -135,18 +135,39 @@ class KLUSolverInterface : public SparseSymLinearSolverInterface
         for (int i = 0; i < ndim_; i++)
         {
             int nR = ia[i + 1] - ia[i];
-            printf("Number of Items in row %d = %d\n", i, nR);
+            // printf("Number of Items in row %d = %d\n", i, nR);
             for (int j = 0; j < nR; j++)
             {
                 int idx = ia[i] + j;
                 int c = ja[idx];
-                printf("[%d, %d] == %d\n", i, c, idx);
+                // printf("[%d, %d] == %d\n", i, c, idx);
                 f_mat << i << " " << c << " " << vals[idx] << "\n";
             }
             f_vec << rhs[i] << "\n";
         }
 
         f_mat.close();
+        f_vec.close();
+    }
+
+    void write_x(double *x, int ndim, std::string prefix, int matrix_seq)
+    {
+        std::string vec_file_name = "x_" + prefix + "_" + intToString(matrix_seq) + ".mtx";
+        printf("Vector Filename: %s\n", vec_file_name.c_str());
+
+        std::ofstream f_vec;
+
+        f_vec.open(vec_file_name);
+
+        f_vec << "%%MatrixMarket matrix array real general\n";
+        f_vec << "% ID: " << matrix_seq << "\n";
+        f_vec << ndim << " " << 1 << "\n";
+
+        for (int i = 0; i < ndim_; i++)
+        {
+            f_vec << x[i] << "\n";
+        }
+
         f_vec.close();
     }
 };

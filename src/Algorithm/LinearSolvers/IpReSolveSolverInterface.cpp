@@ -11,6 +11,9 @@
 
 #include "IpoptConfig.h"
 
+
+#define USE_GLU 1
+
 namespace Ipopt
 {
 #if IPOPT_VERBOSITY > 0
@@ -23,9 +26,11 @@ ReSolveSolverInterface::ReSolveSolverInterface() : val_(NULL)
     using index_type = ReSolve::index_type;
     using real_type = ReSolve::real_type;
     resolve_KLU_ = new ReSolve::LinSolverDirectKLU();
+#if USE_GLU
     workspace_CUDA_ = new ReSolve::LinAlgWorkspaceCUDA();
     workspace_CUDA_->initializeHandles();
     resolve_GLU_ = new ReSolve::LinSolverDirectCuSolverGLU(workspace_CUDA_);
+#endif
 }
 
 ReSolveSolverInterface::~ReSolveSolverInterface()
@@ -36,56 +41,13 @@ ReSolveSolverInterface::~ReSolveSolverInterface()
 
 void ReSolveSolverInterface::RegisterOptions(SmartPtr<RegisteredOptions> roptions)
 {
-    roptions->AddNumberOption("resolve_tol", "Partial pivoting tolerance", 0.001,
-                              "If the diagonal entry has a magnitude greater than or equal to tol "
-                              "times the largest magnitude of entries in the pivot column, then the "
-                              "diagonal entry is chosen.",
-                              false);
-
-    roptions->AddIntegerOption("resolve_ordering", "Which fill-reducing ordering to use", 0,
-                               "0 for AMD, 1 for COLAMD, 2 for a user-provided permutation P and Q (or "
-                               "a natural ordering if P and Q are NULL), or 3 for the user order "
-                               "function.",
-                               false);
-
-    roptions->AddIntegerOption("resolve_btf", "Use BTF", 1,
-                               "if nonzero, then BTF is used to permute the "
-                               "input matrix into block upper triangular form.",
-                               false);
-
-    roptions->AddIntegerOption("resolve_scale", "Whether or not the matrix should be scaled", 2,
-                               "If scale < 0, then no scaling is performed and the input matrix is not "
-                               "checked for errors. If scale >= 0, the input matrix is check for "
-                               "errors. If scale=0, then no scaling is performed. If scale=1, then each "
-                               "row of A is divided by the sum of the absolute values in that row. If "
-                               "scale=2, then each row of A is divided by the maximum absolute value in "
-                               "that row. Default: 2.",
-                               false);
-
-    roptions->AddBoolOption("resolve_halt_if_singular", "how to handle a singular matrix", false,
-                            "FALSE: keep going, TRUE: stop quickly.", false);
+    printf("ReSolveSolverInterface::%s is called\n", __func__);
 }
 
 bool ReSolveSolverInterface::InitializeImpl(const OptionsList &options, const std::string &prefix)
 {
-    printf("InitializeImpl! --ReSolve. This uses ReSolve Matrix Definitions.\n");
+    printf("ReSolveSolverInterface::%s is called\n", __func__);
 
-    /*
-    Number tol;
-    options.GetNumericValue("resolve_tol", tol, prefix);
-
-    Index order_method;
-    options.GetIntegerValue("resolve_ordering", order_method, prefix);
-
-    Index btf;
-    options.GetIntegerValue("resolve_btf", btf, prefix);
-
-    Index scale;
-    options.GetIntegerValue("resolve_scale", scale, prefix);
-
-    bool halt_if_singular;
-    options.GetBoolValue("resolve_halt_if_singular", halt_if_singular, prefix);
-    */
     resolve_KLU_->setupParameters(1, 0.1, false);
 
     return true;
@@ -100,6 +62,8 @@ ESymSolverStatus ReSolveSolverInterface::MultiSolve(bool new_matrix, const Index
     printf("ReSolve MultiSolve Called\n");
 #endif
 
+    A_->updateData(A_->getRowData("cpu"), A_->getColData("cpu"), A_->getValues("cpu"), "cpu", "cuda");
+
 #if 1
     if (factorize_)
     {
@@ -113,6 +77,7 @@ ESymSolverStatus ReSolveSolverInterface::MultiSolve(bool new_matrix, const Index
         }
         printf("Factorize Steps 1\n");
         int status = resolve_KLU_->factorize();
+#if USE_GLU
         printf("Factorize Steps 2\n");
         ReSolve::Matrix *L = resolve_KLU_->getLFactor();
         printf("Factorize Steps 3\n");
@@ -129,6 +94,7 @@ ESymSolverStatus ReSolveSolverInterface::MultiSolve(bool new_matrix, const Index
         printf("Factorize Steps 6\n");
         resolve_GLU_->setup(A_, L, U, P, Q);
         printf("Factorize Steps 7\n");
+#endif
 
         if (HaveIpData())
         {
@@ -169,9 +135,13 @@ ESymSolverStatus ReSolveSolverInterface::MultiSolve(bool new_matrix, const Index
         {
             IpData().TimingStats().LinearSystemFactorization().Start();
         }
-        // resolve_KLU_->refactorize();
+#if USE_GLU
         int status = resolve_GLU_->refactorize();
         std::cout << "CUSOLVER GLU refactorization status: " << status << std::endl;
+#else
+        int status = resolve_KLU_->refactorize();
+        std::cout << "KLU refactorization status: " << status << std::endl;
+#endif
         refactorize_ = false;
         if (HaveIpData())
         {
@@ -188,21 +158,23 @@ ESymSolverStatus ReSolveSolverInterface::MultiSolve(bool new_matrix, const Index
 
     write_CSR_matrix_rhs(A_->getRowData("cpu"), A_->getColData("cpu"), A_->getValues("cpu"), rhs_vals, ndim_, nonzeros_, "RESOLVE",
                          seq);
-    seq++;
 
-    printf("Printing RHS\n");
-    for (int i = 0; i < ndim_; i++)
-    {
-        printf("%d=%f ", i, rhs_vals[i]);
-    }
-    printf("\n");
-
+#if USE_GLU
     // Copy rhs_vals to vec_rhs cuda
     vec_rhs_->update(rhs_vals, "cpu", "cuda");
     int status = resolve_GLU_->solve(vec_rhs_, vec_x_);
     // Copy vec_x cuda to vec_x
     std::cout << "GLU solve status: " << status << std::endl;
     vec_x_->update(vec_x_->getData("cuda"), "cuda", "cpu");
+#else
+    // Copy rhs_vals to vec_rhs cuda
+    vec_rhs_->update(rhs_vals, "cpu", "cpu");
+    int status = resolve_KLU_->solve(vec_rhs_, vec_x_);
+    // Copy vec_x cuda to vec_x
+    std::cout << "KLU solve status: " << status << std::endl;
+#endif
+    write_x(vec_x_->getData("cpu"), ndim_, "RESOLVE", seq);
+    seq++;
     // copy vec_x to rhs_vals
     std::memcpy(rhs_vals, vec_x_->getData("cpu"), (ndim_) * sizeof(ReSolve::real_type));
 
@@ -212,7 +184,7 @@ ESymSolverStatus ReSolveSolverInterface::MultiSolve(bool new_matrix, const Index
     }
 
 #if 0
-printf("ReSolve Solve Done\n");
+   printf("ReSolve Solve Done\n");
 #endif
 
     first_iteration_ = false;
