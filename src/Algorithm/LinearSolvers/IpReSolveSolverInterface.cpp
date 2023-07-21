@@ -5,6 +5,7 @@
 // Authors:  Slaven Peles, Maksudul Alam
 
 #include "IpReSolveSolverInterface.hpp"
+#include "IpoptConfig.h"
 
 #include <cmath>
 #include <iostream>
