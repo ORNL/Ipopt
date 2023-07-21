@@ -38,13 +38,49 @@ ReSolveSolverInterface::~ReSolveSolverInterface()
 
 void ReSolveSolverInterface::RegisterOptions(SmartPtr<RegisteredOptions> roptions)
 {
-    printf("ReSolveSolverInterface::%s is called\n", __func__);
+    roptions->AddNumberOption("resolve_tol", "Partial pivoting tolerance", 0.001,
+                              "If the diagonal entry has a magnitude greater than or equal to tol times the largest "
+                              "magnitude of entries in the pivot column, then the diagonal entry is chosen.",
+                              false);
+
+    roptions->AddIntegerOption("resolve_ordering", "Which fill-reducing ordering to use", 0,
+                               "0 for AMD, 1 for COLAMD, 2 for a user-provided permutation P and Q (or a natural "
+                               "ordering if P and Q are NULL), or 3 for the user order function.",
+                               false);
+
+    roptions->AddIntegerOption(
+        "resolve_btf", "Use BTF", 1,
+        "if nonzero, then BTF is used to permute the input matrix into block upper triangular form.", false);
+
+    roptions->AddIntegerOption(
+        "resolve_scale", "Whether or not the matrix should be scaled", 2,
+        "If scale < 0, then no scaling is performed and the input matrix is not checked for errors. If scale >= 0, the "
+        "input matrix is check for errors. If scale=0, then no scaling is performed. If scale=1, then each row of A is "
+        "divided by the sum of the absolute values in that row. If scale=2, then each row of A is divided by the "
+        "maximum absolute value in that row. Default: 2.",
+        false);
+
+    roptions->AddBoolOption("resolve_halt_if_singular", "how to handle a singular matrix", false,
+                            "FALSE: keep going, TRUE: stop quickly.", false);
 }
 
 bool ReSolveSolverInterface::InitializeImpl(const OptionsList &options, const std::string &prefix)
 {
-    printf("ReSolveSolverInterface::%s is called\n", __func__);
+    Number tol;
+    options.GetNumericValue("resolve_tol", tol, prefix);
 
+    Index order_method;
+    options.GetIntegerValue("resolve_ordering", order_method, prefix);
+
+    Index btf;
+    options.GetIntegerValue("resolve_btf", btf, prefix);
+
+    Index scale;
+    options.GetIntegerValue("resolve_scale", scale, prefix);
+
+    bool halt_if_singular;
+    options.GetBoolValue("resolve_halt_if_singular", halt_if_singular, prefix);
+   
     resolve_KLU_->setupParameters(1, 0.1, false);
 
     return true;
