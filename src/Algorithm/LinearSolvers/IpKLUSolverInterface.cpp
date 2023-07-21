@@ -31,7 +31,6 @@ KLUSolverInterface::~KLUSolverInterface()
 
 void KLUSolverInterface::RegisterOptions(SmartPtr<RegisteredOptions> roptions)
 {
-    printf("This function %s is called\n", __func__);
     roptions->AddNumberOption("klu_tol", "Partial pivoting tolerance", 0.001,
                               "If the diagonal entry has a magnitude greater than or equal to tol times the largest "
                               "magnitude of entries in the pivot column, then the diagonal entry is chosen.",
@@ -60,8 +59,6 @@ void KLUSolverInterface::RegisterOptions(SmartPtr<RegisteredOptions> roptions)
 
 bool KLUSolverInterface::InitializeImpl(const OptionsList &options, const std::string &prefix)
 {
-    printf("InitializeImpl! --KLU\n");
-
     klu_defaults(&Common_);
 
     Number tol;
@@ -97,17 +94,9 @@ ESymSolverStatus KLUSolverInterface::MultiSolve(bool new_matrix, const Index *ia
 {
     DBG_START_METH("KLUSolverInterface::MultiSolve", dbg_verbosity);
 
-#if 0
-   printf("KLU MultiSolve Called\n");
-#endif
-
-#if 1
     if (factorize_)
     {
         // perform the factorization
-#if 0
-      printf("klu_factor Called\n");
-#endif
         if (HaveIpData())
         {
             IpData().TimingStats().LinearSystemFactorization().Start();
@@ -139,16 +128,11 @@ ESymSolverStatus KLUSolverInterface::MultiSolve(bool new_matrix, const Index *ia
             return SYMSOLVER_CALL_AGAIN;
         }
     }
-#endif
 
-#if 1
     // check if a factorization has to be done
     DBG_PRINT((1, "new_matrix = %d\n", new_matrix));
-    if (new_matrix || refactorize_)
+    if (!first_iteration_ && (new_matrix || refactorize_))
     {
-#if 0
-      printf("klu_refactor Called\n");
-#endif
         // perform the factorization
         if (HaveIpData())
         {
@@ -161,27 +145,20 @@ ESymSolverStatus KLUSolverInterface::MultiSolve(bool new_matrix, const Index *ia
             IpData().TimingStats().LinearSystemFactorization().End();
         }
     }
-#endif
 
     if (HaveIpData())
     {
         IpData().TimingStats().LinearSystemBackSolve().Start();
     }
 
-    printf("Printing Matrix\n");
-    write_CSR_matrix_rhs(Ap_, Ai_, val_, rhs_vals, ndim_, nonzeros_, "KLU", seq);
     klu_solve(Symbolic_, Numeric_, ndim_, nrhs, rhs_vals, &Common_);
-    write_x(rhs_vals, ndim_, "KLU", seq);
-    seq++;
 
     if (HaveIpData())
     {
         IpData().TimingStats().LinearSystemBackSolve().End();
     }
 
-#if 0
-   printf("KLU Solve Done\n");
-#endif
+    first_iteration_ = false;
 
     return SYMSOLVER_SUCCESS;
 }
@@ -206,18 +183,14 @@ ESymSolverStatus KLUSolverInterface::InitializeStructure(Index dim, Index nonzer
     ndim_ = dim;
     nonzeros_ = nonzeros;
 
-#if 0
-   Ap_ = new int[dim+1];
-   Ai_ = new int[nonzeros];
-
-   //Copy Structure
-   //const_cast<int*> 
-   for(int i=0;i<=dim;i++){Ap_[i]=ia[i];}
-   for(int i=0;i<nonzeros;i++){Ai_[i]=ja[i];}
-#else
     Ap_ = const_cast<int *>(ia);
     Ai_ = const_cast<int *>(ja);
-#endif
+    // Setup memory for values
+    if (val_ != NULL)
+    {
+        delete[] val_;
+    }
+    val_ = new Number[nonzeros];
 
     if (HaveIpData())
     {
@@ -228,42 +201,15 @@ ESymSolverStatus KLUSolverInterface::InitializeStructure(Index dim, Index nonzer
     {
         IpData().TimingStats().LinearSystemSymbolicFactorization().End();
     }
-    printf("KLU - Symbolic Factorization Done\n");
 
     factorize_ = true;
+    first_iteration_ = true;
 
     if (Symbolic_ == nullptr)
     {
         printf("Symbolic_ factorization crashed with Common_.status = %d \n", Common_.status);
         return SYMSOLVER_FATAL_ERROR;
     }
-
-#if 0
-   printf("dim: %d\n, nonzeros %d\n", dim, nonzeros);
-
-   for(int i=1; i<=dim; i++){
-      printf("ia[%d]=(%d)\n", i, ia[i]);
-   }
-
-   for(int i=0; i< nonzeros; i++){
-      printf("ja[%d]=(%d)\n", i, ja[i]);
-   }
-
-   for(int i=0; i<dim; i++){
-      int n = ia[i+1] - ia[i];
-	  printf("%3d -- %3d:\t", i, n);
-      for(int j=0; j<n; j++){
-         printf("[%3d]=%3d\t", ia[i]+j, ja[ia[i]+j]);
-      }
-      printf("\n------------------------------------\n");
-   }
-#endif
-    // Setup memory for values
-    if (val_ != NULL)
-    {
-        delete[] val_;
-    }
-    val_ = new Number[nonzeros];
 
     initialized_ = true;
 
