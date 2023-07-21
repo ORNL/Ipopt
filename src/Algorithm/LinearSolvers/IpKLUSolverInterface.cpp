@@ -31,6 +31,7 @@ KLUSolverInterface::~KLUSolverInterface()
 
 void KLUSolverInterface::RegisterOptions(SmartPtr<RegisteredOptions> roptions)
 {
+    printf("This function %s is called\n", __func__);
     roptions->AddNumberOption("klu_tol", "Partial pivoting tolerance", 0.001,
                               "If the diagonal entry has a magnitude greater than or equal to tol times the largest "
                               "magnitude of entries in the pivot column, then the diagonal entry is chosen.",
@@ -166,7 +167,13 @@ ESymSolverStatus KLUSolverInterface::MultiSolve(bool new_matrix, const Index *ia
     {
         IpData().TimingStats().LinearSystemBackSolve().Start();
     }
+
+    printf("Printing Matrix\n");
+    write_CSR_matrix_rhs(Ap_, Ai_, val_, rhs_vals, ndim_, nonzeros_, "KLU", seq);
     klu_solve(Symbolic_, Numeric_, ndim_, nrhs, rhs_vals, &Common_);
+    write_x(rhs_vals, ndim_, "KLU", seq);
+    seq++;
+
     if (HaveIpData())
     {
         IpData().TimingStats().LinearSystemBackSolve().End();

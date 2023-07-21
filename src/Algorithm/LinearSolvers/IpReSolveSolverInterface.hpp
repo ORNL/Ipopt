@@ -7,12 +7,9 @@
 #ifndef __IPRESOLVESOLVERINTERFACE_HPP__
 #define __IPRESOLVESOLVERINTERFACE_HPP__
 
-#include "IpLibraryLoader.hpp"
-#include "IpSparseSymLinearSolverInterface.hpp"
-#include "IpTypes.h"
-
-#include "klu.h"
-
+#include <fstream>
+#include <iomanip>
+#include <iostream>
 #include <resolve/LinSolverDirectCuSolverGLU.hpp>
 #include <resolve/LinSolverDirectKLU.hpp>
 #include <resolve/MatrixCOO.hpp>
@@ -22,6 +19,13 @@
 #include <resolve/Vector.hpp>
 #include <resolve/VectorHandler.hpp>
 #include <resolve/matrix/io.hpp>
+#include <sstream>
+#include <string>
+
+#include "IpLibraryLoader.hpp"
+#include "IpSparseSymLinearSolverInterface.hpp"
+#include "IpTypes.h"
+#include "klu.h"
 
 namespace Ipopt
 {
@@ -105,6 +109,78 @@ class ReSolveSolverInterface : public SparseSymLinearSolverInterface
     ReSolve::MatrixCSR *A_;
     ReSolve::Vector *vec_rhs_;
     ReSolve::Vector *vec_x_;
+    ReSolve::LinAlgWorkspaceCUDA *workspace_CUDA_ = new ReSolve::LinAlgWorkspaceCUDA;
+    ReSolve::LinSolverDirectCuSolverGLU *resolve_GLU_;
+
+    int seq = 0;
+
+    std::string intToString(int value)
+    {
+        std::stringstream ss;
+        ss << std::setw(2) << std::setfill('0') << value;
+        return ss.str();
+    }
+
+    void write_CSR_matrix_rhs(int *ia, int *ja, double *vals, double *rhs, int ndim, int nonzeros, std::string prefix,
+                              int matrix_seq)
+    {
+        std::string mat_file_name = "matrix_" + prefix + "_" + intToString(matrix_seq) + ".mtx";
+        std::string vec_file_name = "rhs_" + prefix + "_" + intToString(matrix_seq) + ".mtx";
+        printf("Matrix Filename: %s\n", mat_file_name.c_str());
+        printf("Vector Filename: %s\n", vec_file_name.c_str());
+
+        std::ofstream f_mat;
+        std::ofstream f_vec;
+
+        f_mat.open(mat_file_name);
+        f_vec.open(vec_file_name);
+
+        f_mat << "%%MatrixMarket matrix coordinate real symmetric\n";
+        f_mat << "% ID: " << matrix_seq << "\n";
+        f_mat << ndim << " " << ndim << " " << nonzeros << "\n";
+
+        f_vec << "%%MatrixMarket matrix array real general\n";
+        f_vec << "% ID: " << matrix_seq << "\n";
+        f_vec << ndim << " " << 1 << "\n";
+
+        for (int i = 0; i < ndim_; i++)
+        {
+            int nR = ia[i + 1] - ia[i];
+            // printf("Number of Items in row %d = %d\n", i, nR);
+            for (int j = 0; j < nR; j++)
+            {
+                int idx = ia[i] + j;
+                int c = ja[idx];
+                // printf("[%d, %d] == %d\n", i, c, idx);
+                f_mat << i << " " << c << " " << vals[idx] << "\n";
+            }
+            f_vec << rhs[i] << "\n";
+        }
+
+        f_mat.close();
+        f_vec.close();
+    }
+
+    void write_x(double *x, int ndim, std::string prefix, int matrix_seq)
+    {
+        std::string vec_file_name = "x_" + prefix + "_" + intToString(matrix_seq) + ".mtx";
+        printf("Vector Filename: %s\n", vec_file_name.c_str());
+
+        std::ofstream f_vec;
+
+        f_vec.open(vec_file_name);
+
+        f_vec << "%%MatrixMarket matrix array real general\n";
+        f_vec << "% ID: " << matrix_seq << "\n";
+        f_vec << ndim << " " << 1 << "\n";
+
+        for (int i = 0; i < ndim_; i++)
+        {
+            f_vec << x[i] << "\n";
+        }
+
+        f_vec.close();
+    }
 };
 
 } // namespace Ipopt
