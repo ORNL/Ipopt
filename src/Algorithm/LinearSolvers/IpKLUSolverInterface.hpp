@@ -84,23 +84,23 @@ class KLUSolverInterface : public SparseSymLinearSolverInterface
     ///@}
 
     /** Number of nonzeros of the matrix */
-    Index nonzeros_;
+    Index _nonzeros;
 
-    bool initialized_;
-    Index ndim_;          ///< Number of dimensions
-    Number *val_;         ///< Storage for variables
-    Index numneg_;        ///< Number of negative pivots in last factorization
-    bool pivtol_changed_; ///< indicates if pivtol has been changed
-    bool refactorize_;
-    bool factorize_;
-    bool first_iteration_;
+    bool _initialized;
+    Index _ndim;          ///< Number of dimensions
+    Number *_val;         ///< Storage for variables
+    Index _numneg;        ///< Number of negative pivots in last factorization
+    bool _pivtol_changed; ///< indicates if pivtol has been changed
+    bool _re_factorize;
+    bool _factorize;
+    bool _first_iteration;
 
-    klu_symbolic *Symbolic_;
-    klu_numeric *Numeric_;
-    klu_common Common_;
+    klu_symbolic *_Symbolic;
+    klu_numeric *_Numeric;
+    klu_common _Common;
 
-    int *Ap_;
-    int *Ai_;
+    int *_Ai;
+    int *_Aj;
 };
 
 } // namespace Ipopt

@@ -93,23 +93,24 @@ class ReSolveSolverInterface : public SparseSymLinearSolverInterface
     ///@}
 
     /** Number of nonzeros of the matrix */
-    Index nonzeros_;
+    Index _nonzeros;
 
-    bool initialized_;
-    Index ndim_;          ///< Number of dimensions
-    Number *val_;         ///< Storage for variables
-    Index numneg_;        ///< Number of negative pivots in last factorization
-    bool pivtol_changed_; ///< indicates if pivtol has been changed
-    bool refactorize_;
-    bool factorize_;
-    bool first_iteration_;
+    bool _initialized;
+    Index _ndim;          ///< Number of dimensions
+    Number *_val;         ///< Storage for variables
+    Index _numneg;        ///< Number of negative pivots in last factorization
+    bool _pivtol_changed; ///< indicates if pivtol has been changed
+    bool _re_factorize;
+    bool _factorize;
+    bool _first_iteration;
+    bool _use_glu;
 
-    ReSolve::LinSolverDirectKLU *resolve_KLU_;
-    ReSolve::MatrixCSR *A_;
-    ReSolve::Vector *vec_rhs_;
-    ReSolve::Vector *vec_x_;
-    ReSolve::LinAlgWorkspaceCUDA *workspace_CUDA_;
-    ReSolve::LinSolverDirectCuSolverGLU *resolve_GLU_;
+    ReSolve::LinSolverDirectKLU *_resolve_KLU;
+    ReSolve::MatrixCSR *_A;
+    ReSolve::Vector *_vec_rhs;
+    ReSolve::Vector *_vec_x;
+    ReSolve::LinAlgWorkspaceCUDA *_workspace_CUDA;
+    ReSolve::LinSolverDirectCuSolverGLU *_resolve_GLU;
 };
 
 } // namespace Ipopt
