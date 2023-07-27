@@ -29,13 +29,22 @@ ReSolveSolverInterface::~ReSolveSolverInterface()
 
 void ReSolveSolverInterface::RegisterOptions(SmartPtr<RegisteredOptions> roptions)
 {
+    std::vector<std::string> options;
+    std::vector<std::string> descrs;
 
-    roptions->AddBoolOption("resolve_use_glu", //
-                            "Use GLU",         //
-                            true,              //
-                            "If the diagonal entry has a magnitude greater than or equal to tol times the largest "
-                            "magnitude of entries in the pivot column, then the diagonal entry is chosen.",
-                            false);
+    options.push_back(resolve_klu);
+    descrs.push_back("Use KLU");
+
+    options.push_back(resolve_glu);
+    descrs.push_back("Use GLU");
+
+    roptions->AddStringOption("resolve_method",                               //
+                              "Indicates which linear solver should be used", //
+                              "klu",                                          //
+                              options,                                        //
+                              descrs,                                         //
+                              "This is experimental and does not work well.", //
+                              true);
 
     roptions->AddNumberOption("resolve_tol",                //
                               "Partial pivoting tolerance", //
@@ -85,14 +94,14 @@ bool ReSolveSolverInterface::InitializeImpl(const OptionsList &options, const st
     bool halt_if_singular;
     options.GetBoolValue("resolve_halt_if_singular", halt_if_singular, prefix);
 
-    bool use_glu;
-    options.GetBoolValue("resolve_use_glu", use_glu, prefix);
-    _use_glu = use_glu;
+    std::string method;
+    options.GetStringValue("resolve_method", method, prefix);
+    _method = method;
 
     _resolve_KLU = new ReSolve::LinSolverDirectKLU();
     _resolve_KLU->setupParameters(order_method, tol, halt_if_singular);
 
-    if (_use_glu)
+    if (_method == resolve_glu)
     {
         _workspace_CUDA = new ReSolve::LinAlgWorkspaceCUDA();
         _workspace_CUDA->initializeHandles();
@@ -117,7 +126,7 @@ ESymSolverStatus ReSolveSolverInterface::MultiSolve(bool new_matrix, const Index
             IpData().TimingStats().LinearSystemFactorization().Start();
         }
         int status = _resolve_KLU->factorize();
-        if (_use_glu)
+        if (_method == resolve_glu)
         {
             ReSolve::Matrix *L = _resolve_KLU->getLFactor();
             ReSolve::Matrix *U = _resolve_KLU->getUFactor();
@@ -168,7 +177,7 @@ ESymSolverStatus ReSolveSolverInterface::MultiSolve(bool new_matrix, const Index
         {
             IpData().TimingStats().LinearSystemFactorization().Start();
         }
-        if (_use_glu)
+        if (_method == resolve_glu)
         {
             int status = _resolve_GLU->refactorize();
             if (status != 0)
@@ -196,7 +205,7 @@ ESymSolverStatus ReSolveSolverInterface::MultiSolve(bool new_matrix, const Index
         IpData().TimingStats().LinearSystemBackSolve().Start();
     }
 
-    if (_use_glu)
+    if (_method == resolve_glu)
     {
         // Copy rhs_vals to vec_rhs cuda
         _vec_rhs->update(rhs_vals, "cpu", "cuda");

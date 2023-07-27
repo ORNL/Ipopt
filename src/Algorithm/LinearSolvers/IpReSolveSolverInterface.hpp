@@ -28,6 +28,10 @@
 
 namespace Ipopt
 {
+
+static const std::string resolve_glu = "glu";
+static const std::string resolve_klu = "klu";
+
 /** Interface to the symmetric linear solver ReSolve, derived from
  *  SparseSymLinearSolverInterface.
  */
@@ -103,7 +107,8 @@ class ReSolveSolverInterface : public SparseSymLinearSolverInterface
     bool _re_factorize;
     bool _factorize;
     bool _first_iteration;
-    bool _use_glu;
+    // bool _use_glu;
+    std::string _method;
 
     ReSolve::LinSolverDirectKLU *_resolve_KLU;
     ReSolve::MatrixCSR *_A;
