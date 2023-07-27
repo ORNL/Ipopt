@@ -11,6 +11,7 @@
 #include <iomanip>
 #include <iostream>
 #include <resolve/LinSolverDirectCuSolverGLU.hpp>
+#include <resolve/LinSolverDirectCuSolverRf.hpp>
 #include <resolve/LinSolverDirectKLU.hpp>
 #include <resolve/MatrixCOO.hpp>
 #include <resolve/MatrixCSC.hpp>
@@ -31,6 +32,8 @@ namespace Ipopt
 
 static const std::string resolve_glu = "glu";
 static const std::string resolve_klu = "klu";
+static const std::string resolve_rf = "rf";
+static const std::string resolve_fgmres = "fgmres";
 
 /** Interface to the symmetric linear solver ReSolve, derived from
  *  SparseSymLinearSolverInterface.
@@ -116,6 +119,10 @@ class ReSolveSolverInterface : public SparseSymLinearSolverInterface
     ReSolve::Vector *_vec_x;
     ReSolve::LinAlgWorkspaceCUDA *_workspace_CUDA;
     ReSolve::LinSolverDirectCuSolverGLU *_resolve_GLU;
+    ReSolve::LinSolverDirectCuSolverRf *_resolve_Rf;
+
+    ReSolve::MatrixHandler *_matrix_handler; // =  new ReSolve::MatrixHandler(workspace_CUDA);
+    ReSolve::VectorHandler *_vector_handler; // =  new ReSolve::VectorHandler(workspace_CUDA);
 };
 
 } // namespace Ipopt

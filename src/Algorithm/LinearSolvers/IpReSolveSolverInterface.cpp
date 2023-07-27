@@ -38,6 +38,12 @@ void ReSolveSolverInterface::RegisterOptions(SmartPtr<RegisteredOptions> roption
     options.push_back(resolve_glu);
     descrs.push_back("Use GLU");
 
+    options.push_back(resolve_rf);
+    descrs.push_back("Use RF");
+
+    options.push_back(resolve_fgmres);
+    descrs.push_back("Use FGMRES");
+
     roptions->AddStringOption("resolve_method",                               //
                               "Indicates which linear solver should be used", //
                               "klu",                                          //
@@ -107,6 +113,14 @@ bool ReSolveSolverInterface::InitializeImpl(const OptionsList &options, const st
         _workspace_CUDA->initializeHandles();
         _resolve_GLU = new ReSolve::LinSolverDirectCuSolverGLU(_workspace_CUDA);
     }
+    else if (_method == resolve_rf)
+    {
+        _workspace_CUDA = new ReSolve::LinAlgWorkspaceCUDA();
+        _workspace_CUDA->initializeHandles();
+        _resolve_Rf = new ReSolve::LinSolverDirectCuSolverRf();
+        _matrix_handler = new ReSolve::MatrixHandler(_workspace_CUDA);
+        _vector_handler = new ReSolve::VectorHandler(_workspace_CUDA);
+    }
 
     return true;
 }
@@ -137,6 +151,36 @@ ESymSolverStatus ReSolveSolverInterface::MultiSolve(bool new_matrix, const Index
             ReSolve::index_type *P = _resolve_KLU->getPOrdering();
             ReSolve::index_type *Q = _resolve_KLU->getQOrdering();
             _resolve_GLU->setup(_A, L, U, P, Q);
+
+            delete[] P;
+            delete[] Q;
+            delete L;
+            delete U;
+        }
+        else if (_method == resolve_rf)
+        {
+            ReSolve::MatrixCSC *L_csc = (ReSolve::MatrixCSC *)_resolve_KLU->getLFactor();
+            ReSolve::MatrixCSC *U_csc = (ReSolve::MatrixCSC *)_resolve_KLU->getUFactor();
+            ReSolve::MatrixCSR *L =
+                new ReSolve::MatrixCSR(L_csc->getNumRows(), L_csc->getNumColumns(), L_csc->getNnz());
+            ReSolve::MatrixCSR *U =
+                new ReSolve::MatrixCSR(U_csc->getNumRows(), U_csc->getNumColumns(), U_csc->getNnz());
+            _matrix_handler->csc2csr(L_csc, L, "cuda");
+            _matrix_handler->csc2csr(U_csc, U, "cuda");
+            if (L == nullptr)
+            {
+                printf("ERROR");
+            }
+            ReSolve::index_type *P = _resolve_KLU->getPOrdering();
+            ReSolve::index_type *Q = _resolve_KLU->getQOrdering();
+            _resolve_Rf->setup(_A, L, U, P, Q);
+
+            delete[] P;
+            delete[] Q;
+            delete L;
+            delete L_csc;
+            delete U;
+            delete U_csc;
         }
 
         if (HaveIpData())
@@ -185,6 +229,14 @@ ESymSolverStatus ReSolveSolverInterface::MultiSolve(bool new_matrix, const Index
                 std::cout << "CUSOLVER GLU refactorization status: " << status << std::endl;
             }
         }
+        else if (_method == resolve_rf)
+        {
+            int status = _resolve_Rf->refactorize();
+            if (status != 0)
+            {
+                std::cout << "CUSOLVER RF refactorization status: " << status << std::endl;
+            }
+        }
         else
         {
             int status = _resolve_KLU->refactorize();
@@ -210,6 +262,18 @@ ESymSolverStatus ReSolveSolverInterface::MultiSolve(bool new_matrix, const Index
         // Copy rhs_vals to vec_rhs cuda
         _vec_rhs->update(rhs_vals, "cpu", "cuda");
         int status = _resolve_GLU->solve(_vec_rhs, _vec_x);
+        if (status != 0)
+        {
+            std::cout << "GLU solve status: " << status << std::endl;
+        }
+        // Copy vec_x cuda to vec_x in cpu
+        _vec_x->update(_vec_x->getData("cuda"), "cuda", "cpu");
+    }
+    else if (_method == resolve_rf)
+    {
+        // Copy rhs_vals to vec_rhs cuda
+        _vec_rhs->update(rhs_vals, "cpu", "cuda");
+        int status = _resolve_Rf->solve(_vec_rhs, _vec_x);
         if (status != 0)
         {
             std::cout << "GLU solve status: " << status << std::endl;
