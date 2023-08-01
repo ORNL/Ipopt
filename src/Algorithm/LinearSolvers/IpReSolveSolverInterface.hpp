@@ -13,6 +13,7 @@
 #include <resolve/LinSolverDirectCuSolverGLU.hpp>
 #include <resolve/LinSolverDirectCuSolverRf.hpp>
 #include <resolve/LinSolverDirectKLU.hpp>
+#include <resolve/LinSolverIterativeFGMRES.hpp>
 #include <resolve/MatrixCOO.hpp>
 #include <resolve/MatrixCSC.hpp>
 #include <resolve/MatrixCSR.hpp>
@@ -33,96 +34,96 @@ namespace Ipopt
 static const std::string resolve_glu = "glu";
 static const std::string resolve_klu = "klu";
 static const std::string resolve_rf = "rf";
-static const std::string resolve_fgmres = "fgmres";
+static const std::string resolve_rf_fgmres = "rf_fgmres";
 
 /** Interface to the symmetric linear solver ReSolve, derived from
  *  SparseSymLinearSolverInterface.
  */
 class ReSolveSolverInterface : public SparseSymLinearSolverInterface
 {
-  public:
-    /** @name Constructor/Destructor */
-    ///@{
-    /** Constructor */
-    ReSolveSolverInterface();
+public:
+  /** @name Constructor/Destructor */
+  ///@{
+  /** Constructor */
+  ReSolveSolverInterface();
 
-    /** Destructor */
-    virtual ~ReSolveSolverInterface();
-    ///@}
+  /** Destructor */
+  virtual ~ReSolveSolverInterface();
+  ///@}
 
-    bool InitializeImpl(const OptionsList &options, const std::string &prefix);
+  bool InitializeImpl(const OptionsList& options, const std::string& prefix);
 
-    /** @name Methods for requesting solution of the linear system. */
-    ///@{
-    virtual ESymSolverStatus InitializeStructure(Index dim, Index nonzeros, const Index *airn, const Index *ajcn);
+  /** @name Methods for requesting solution of the linear system. */
+  ///@{
+  virtual ESymSolverStatus InitializeStructure(Index dim, Index nonzeros, const Index* airn, const Index* ajcn);
 
-    virtual Number *GetValuesArrayPtr();
+  virtual Number* GetValuesArrayPtr();
 
-    virtual ESymSolverStatus MultiSolve(bool new_matrix, const Index *airn, const Index *ajcn, Index nrhs,
-                                        Number *rhs_vals, bool check_NegEVals, Index numberOfNegEVals);
+  virtual ESymSolverStatus MultiSolve(bool new_matrix, const Index* airn, const Index* ajcn, Index nrhs, Number* rhs_vals, bool check_NegEVals, Index numberOfNegEVals);
 
-    virtual Index NumberOfNegEVals() const;
-    ///@}
+  virtual Index NumberOfNegEVals() const;
+  ///@}
 
-    //* @name Options of Linear solver */
-    ///@{
-    virtual bool IncreaseQuality();
+  //* @name Options of Linear solver */
+  ///@{
+  virtual bool IncreaseQuality();
 
-    virtual bool ProvidesInertia() const
-    {
-        return false;
-    }
+  virtual bool ProvidesInertia() const
+  {
+    return false;
+  }
 
-    EMatrixFormat MatrixFormat() const
-    {
-        return CSR_Full_Format_0_Offset;
-    }
-    ///@}
+  EMatrixFormat MatrixFormat() const
+  {
+    return CSR_Full_Format_0_Offset;
+  }
+  ///@}
 
-    ///@{
-    static void RegisterOptions(SmartPtr<RegisteredOptions> roptions);
-    ///@}
+  ///@{
+  static void RegisterOptions(SmartPtr<RegisteredOptions> roptions);
+  ///@}
 
-  private:
-    /**@name Default Compiler Generated Methods
-     * (Hidden to avoid implicit creation/calling).
-     * These methods are not implemented and
-     * we do not want the compiler to implement
-     * them for us, so we declare them private
-     * and do not define them. This ensures that
-     * they will not be implicitly created/called. */
-    ///@{
-    /** Copy Constructor */
-    ReSolveSolverInterface(const ReSolveSolverInterface &);
+private:
+  /**@name Default Compiler Generated Methods
+   * (Hidden to avoid implicit creation/calling).
+   * These methods are not implemented and
+   * we do not want the compiler to implement
+   * them for us, so we declare them private
+   * and do not define them. This ensures that
+   * they will not be implicitly created/called. */
+  ///@{
+  /** Copy Constructor */
+  ReSolveSolverInterface(const ReSolveSolverInterface&);
 
-    /** Default Assignment Operator */
-    void operator=(const ReSolveSolverInterface &);
-    ///@}
+  /** Default Assignment Operator */
+  void operator=(const ReSolveSolverInterface&);
+  ///@}
 
-    /** Number of nonzeros of the matrix */
-    Index _nonzeros;
+  /** Number of nonzeros of the matrix */
+  Index _nonzeros;
 
-    bool _initialized;
-    Index _ndim;          ///< Number of dimensions
-    Number *_val;         ///< Storage for variables
-    Index _numneg;        ///< Number of negative pivots in last factorization
-    bool _pivtol_changed; ///< indicates if pivtol has been changed
-    bool _re_factorize;
-    bool _factorize;
-    bool _first_iteration;
-    // bool _use_glu;
-    std::string _method;
+  bool _initialized;
+  Index _ndim;          ///< Number of dimensions
+  Number* _val;         ///< Storage for variables
+  Index _numneg;        ///< Number of negative pivots in last factorization
+  bool _pivtol_changed; ///< indicates if pivtol has been changed
+  bool _re_factorize;
+  bool _factorize;
+  bool _first_iteration;
+  std::string _method;
+  int _n_iteration;
 
-    ReSolve::LinSolverDirectKLU *_resolve_KLU;
-    ReSolve::MatrixCSR *_A;
-    ReSolve::Vector *_vec_rhs;
-    ReSolve::Vector *_vec_x;
-    ReSolve::LinAlgWorkspaceCUDA *_workspace_CUDA;
-    ReSolve::LinSolverDirectCuSolverGLU *_resolve_GLU;
-    ReSolve::LinSolverDirectCuSolverRf *_resolve_Rf;
+  ReSolve::LinSolverDirectKLU* _resolve_KLU;
+  ReSolve::MatrixCSR* _A;
+  ReSolve::Vector* _vec_rhs;
+  ReSolve::Vector* _vec_x;
+  ReSolve::LinAlgWorkspaceCUDA* _workspace_CUDA;
+  ReSolve::LinSolverDirectCuSolverGLU* _resolve_GLU;
+  ReSolve::LinSolverDirectCuSolverRf* _resolve_Rf;
+  ReSolve::LinSolverIterativeFGMRES* _resolve_FGMRES;
 
-    ReSolve::MatrixHandler *_matrix_handler; // =  new ReSolve::MatrixHandler(workspace_CUDA);
-    ReSolve::VectorHandler *_vector_handler; // =  new ReSolve::VectorHandler(workspace_CUDA);
+  ReSolve::MatrixHandler* _matrix_handler;
+  ReSolve::VectorHandler* _vector_handler;
 };
 
 } // namespace Ipopt
