@@ -14,13 +14,13 @@
 #include <resolve/LinSolverDirectCuSolverRf.hpp>
 #include <resolve/LinSolverDirectKLU.hpp>
 #include <resolve/LinSolverIterativeFGMRES.hpp>
-#include <resolve/MatrixCOO.hpp>
-#include <resolve/MatrixCSC.hpp>
-#include <resolve/MatrixCSR.hpp>
-#include <resolve/MatrixHandler.hpp>
-#include <resolve/Vector.hpp>
-#include <resolve/VectorHandler.hpp>
+#include <resolve/matrix/Coo.hpp>
+#include <resolve/matrix/Csr.hpp>
+#include <resolve/matrix/Csc.hpp>
+#include <resolve/vector/Vector.hpp>
 #include <resolve/matrix/io.hpp>
+#include <resolve/matrix/MatrixHandler.hpp>
+#include <resolve/vector/VectorHandler.hpp>
 #include <sstream>
 #include <string>
 
@@ -114,9 +114,9 @@ private:
   int _n_iteration;
 
   ReSolve::LinSolverDirectKLU* _resolve_KLU;
-  ReSolve::MatrixCSR* _A;
-  ReSolve::Vector* _vec_rhs;
-  ReSolve::Vector* _vec_x;
+  ReSolve::matrix::Csr* _A;
+  ReSolve::vector::Vector* _vec_rhs;
+  ReSolve::vector::Vector* _vec_x;
   ReSolve::LinAlgWorkspaceCUDA* _workspace_CUDA;
   ReSolve::LinSolverDirectCuSolverGLU* _resolve_GLU;
   ReSolve::LinSolverDirectCuSolverRf* _resolve_Rf;

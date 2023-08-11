@@ -146,7 +146,7 @@ ESymSolverStatus ReSolveSolverInterface::InitializeStructure(Index dim, Index no
   _ndim = dim;
   _nonzeros = nonzeros;
 
-  _A = new ReSolve::MatrixCSR(dim, dim, nonzeros);
+  _A = new ReSolve::matrix::Csr(dim, dim, nonzeros);
   if (_val != NULL)
   {
     delete[] _val;
@@ -157,8 +157,8 @@ ESymSolverStatus ReSolveSolverInterface::InitializeStructure(Index dim, Index no
 
   _resolve_KLU->setup(_A);
 
-  _vec_rhs = new ReSolve::Vector(_A->getNumRows());
-  _vec_x = new ReSolve::Vector(_A->getNumRows());
+  _vec_rhs = new ReSolve::vector::Vector(_A->getNumRows());
+  _vec_x = new ReSolve::vector::Vector(_A->getNumRows());
 
   _vec_x->allocate("cpu"); // for KLU
   _vec_x->allocate("cuda");
@@ -218,8 +218,8 @@ ESymSolverStatus ReSolveSolverInterface::MultiSolve(bool new_matrix, const Index
     // GLU can be setup as early as possible
     if (_method == resolve_glu)
     {
-      ReSolve::Matrix* L = _resolve_KLU->getLFactor();
-      ReSolve::Matrix* U = _resolve_KLU->getUFactor();
+      ReSolve::matrix::Sparse* L = _resolve_KLU->getLFactor();
+      ReSolve::matrix::Sparse* U = _resolve_KLU->getUFactor();
       if (L == nullptr)
       {
         printf("ERROR");
@@ -342,10 +342,10 @@ ESymSolverStatus ReSolveSolverInterface::MultiSolve(bool new_matrix, const Index
     printf("Iteration: %d: Setting up %s\n", _n_iteration, _method.c_str());
     if (_method == resolve_rf)
     {
-      ReSolve::MatrixCSC* L_csc = (ReSolve::MatrixCSC*)_resolve_KLU->getLFactor();
-      ReSolve::MatrixCSC* U_csc = (ReSolve::MatrixCSC*)_resolve_KLU->getUFactor();
-      ReSolve::MatrixCSR* L = new ReSolve::MatrixCSR(L_csc->getNumRows(), L_csc->getNumColumns(), L_csc->getNnz());
-      ReSolve::MatrixCSR* U = new ReSolve::MatrixCSR(U_csc->getNumRows(), U_csc->getNumColumns(), U_csc->getNnz());
+      ReSolve::matrix::Csc* L_csc = (ReSolve::matrix::Csc*)_resolve_KLU->getLFactor();
+      ReSolve::matrix::Csc* U_csc = (ReSolve::matrix::Csc*)_resolve_KLU->getUFactor();
+      ReSolve::matrix::Csr* L = new ReSolve::matrix::Csr(L_csc->getNumRows(), L_csc->getNumColumns(), L_csc->getNnz());
+      ReSolve::matrix::Csr* U = new ReSolve::matrix::Csr(U_csc->getNumRows(), U_csc->getNumColumns(), U_csc->getNnz());
       _matrix_handler->csc2csr(L_csc, L, "cuda");
       _matrix_handler->csc2csr(U_csc, U, "cuda");
       if (L == nullptr)
@@ -365,10 +365,10 @@ ESymSolverStatus ReSolveSolverInterface::MultiSolve(bool new_matrix, const Index
     }
     else if (_method == resolve_rf_fgmres)
     {
-      ReSolve::MatrixCSC* L_csc = (ReSolve::MatrixCSC*)_resolve_KLU->getLFactor();
-      ReSolve::MatrixCSC* U_csc = (ReSolve::MatrixCSC*)_resolve_KLU->getUFactor();
-      ReSolve::MatrixCSR* L = new ReSolve::MatrixCSR(L_csc->getNumRows(), L_csc->getNumColumns(), L_csc->getNnz());
-      ReSolve::MatrixCSR* U = new ReSolve::MatrixCSR(U_csc->getNumRows(), U_csc->getNumColumns(), U_csc->getNnz());
+      ReSolve::matrix::Csc* L_csc = (ReSolve::matrix::Csc*)_resolve_KLU->getLFactor();
+      ReSolve::matrix::Csc* U_csc = (ReSolve::matrix::Csc*)_resolve_KLU->getUFactor();
+      ReSolve::matrix::Csr* L = new ReSolve::matrix::Csr(L_csc->getNumRows(), L_csc->getNumColumns(), L_csc->getNnz());
+      ReSolve::matrix::Csr* U = new ReSolve::matrix::Csr(U_csc->getNumRows(), U_csc->getNumColumns(), U_csc->getNnz());
       _matrix_handler->csc2csr(L_csc, L, "cuda");
       _matrix_handler->csc2csr(U_csc, U, "cuda");
       if (L == nullptr)
