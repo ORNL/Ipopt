@@ -10,9 +10,11 @@
 #include <fstream>
 #include <iomanip>
 #include <iostream>
-#include <resolve/LinSolverDirectCuSolverGLU.hpp>
-#include <resolve/LinSolverDirectCuSolverRf.hpp>
+//#include <resolve/LinSolverDirectCuSolverGLU.hpp>
+//#include <resolve/LinSolverDirectCuSolverRf.hpp>
 #include <resolve/LinSolverDirectKLU.hpp>
+#include <resolve/LinSolverDirectRocSolverRf.hpp>
+#include <resolve/workspace/LinAlgWorkspace.hpp>
 #include <resolve/LinSolverIterativeFGMRES.hpp>
 #include <resolve/matrix/Coo.hpp>
 #include <resolve/matrix/Csr.hpp>
@@ -27,6 +29,8 @@
 #include "IpLibraryLoader.hpp"
 #include "IpSparseSymLinearSolverInterface.hpp"
 #include "IpTypes.h"
+
+using namespace ReSolve::constants;
 
 namespace Ipopt
 {
@@ -117,9 +121,9 @@ private:
   ReSolve::matrix::Csr* _A;
   ReSolve::vector::Vector* _vec_rhs;
   ReSolve::vector::Vector* _vec_x;
-  ReSolve::LinAlgWorkspaceCUDA* _workspace_CUDA;
-  ReSolve::LinSolverDirectCuSolverGLU* _resolve_GLU;
-  ReSolve::LinSolverDirectCuSolverRf* _resolve_Rf;
+  ReSolve::LinAlgWorkspaceHIP* _workspace_HIP;
+  ReSolve::LinSolverDirectRocSolverRf* _resolve_Rf;
+  ReSolve::GramSchmidt* _GS;
   ReSolve::LinSolverIterativeFGMRES* _resolve_FGMRES;
 
   ReSolve::MatrixHandler* _matrix_handler;
