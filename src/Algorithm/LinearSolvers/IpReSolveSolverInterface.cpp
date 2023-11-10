@@ -128,7 +128,8 @@ bool ReSolveSolverInterface::InitializeImpl(const OptionsList& options, const st
     _resolve_Rf = new ReSolve::LinSolverDirectCuSolverRf();
     _matrix_handler = new ReSolve::MatrixHandler(_workspace_CUDA);
     _vector_handler = new ReSolve::VectorHandler(_workspace_CUDA);
-    _resolve_FGMRES = new ReSolve::LinSolverIterativeFGMRES(_matrix_handler, _vector_handler);
+    _GS = new ReSolve::GramSchmidt(_vector_handler, ReSolve::GramSchmidt::cgs2);
+    _resolve_FGMRES = new ReSolve::LinSolverIterativeFGMRES(_matrix_handler, _vector_handler, _GS);
   }
 
   return true;
@@ -153,15 +154,15 @@ ESymSolverStatus ReSolveSolverInterface::InitializeStructure(Index dim, Index no
   }
   _val = new Number[nonzeros];
 
-  _A->setMatrixData(const_cast<int*>(ia), const_cast<int*>(ja), _val, "cpu");
+  _A->setMatrixData(const_cast<int*>(ia), const_cast<int*>(ja), _val, ReSolve::memory::HOST);
 
   _resolve_KLU->setup(_A);
 
   _vec_rhs = new ReSolve::vector::Vector(_A->getNumRows());
   _vec_x = new ReSolve::vector::Vector(_A->getNumRows());
 
-  _vec_x->allocate("cpu"); // for KLU
-  _vec_x->allocate("cuda");
+  _vec_x->allocate(ReSolve::memory::HOST); // for KLU
+  _vec_x->allocate(ReSolve::memory::DEVICE);
 
   if (HaveIpData())
   {
@@ -192,7 +193,7 @@ ESymSolverStatus ReSolveSolverInterface::MultiSolve(bool new_matrix, const Index
 {
   DBG_START_METH("ReSolveSolverInterface::MultiSolve", dbg_verbosity);
 
-  _A->updateData(_A->getRowData("cpu"), _A->getColData("cpu"), _A->getValues("cpu"), "cpu", "cuda");
+  _A->updateData(_A->getRowData(ReSolve::memory::HOST), _A->getColData(ReSolve::memory::HOST), _A->getValues(ReSolve::memory::HOST), ReSolve::memory::HOST, ReSolve::memory::DEVICE);
 
   if (_factorize)
   {
@@ -318,19 +319,19 @@ ESymSolverStatus ReSolveSolverInterface::MultiSolve(bool new_matrix, const Index
     if (_method == resolve_glu)
     {
       // Copy rhs_vals to vec_rhs cuda
-      _vec_rhs->update(rhs_vals, "cpu", "cuda");
+      _vec_rhs->update(rhs_vals, ReSolve::memory::HOST, ReSolve::memory::DEVICE);
       int status = _resolve_GLU->solve(_vec_rhs, _vec_x);
       if (status != 0)
       {
         std::cout << "GLU solve status: " << status << std::endl;
       }
       // Copy vec_x cuda to vec_x in cpu
-      _vec_x->update(_vec_x->getData("cuda"), "cuda", "cpu");
+      _vec_x->update(_vec_x->getData(ReSolve::memory::DEVICE), ReSolve::memory::DEVICE, ReSolve::memory::HOST);
     }
     else // USE KLU
     {
       // Copy rhs_vals to vec_rhs cuda
-      _vec_rhs->update(rhs_vals, "cpu", "cpu");
+      _vec_rhs->update(rhs_vals, ReSolve::memory::DEVICE, ReSolve::memory::DEVICE);
       int status = _resolve_KLU->solve(_vec_rhs, _vec_x);
       if (status != 0)
       {
@@ -395,31 +396,31 @@ ESymSolverStatus ReSolveSolverInterface::MultiSolve(bool new_matrix, const Index
     if (_method == resolve_glu)
     {
       // Copy rhs_vals to vec_rhs cuda
-      _vec_rhs->update(rhs_vals, "cpu", "cuda");
+      _vec_rhs->update(rhs_vals, ReSolve::memory::HOST, ReSolve::memory::DEVICE);
       int status = _resolve_GLU->solve(_vec_rhs, _vec_x);
       if (status != 0)
       {
         std::cout << "GLU solve status: " << status << std::endl;
       }
       // Copy vec_x cuda to vec_x in cpu
-      _vec_x->update(_vec_x->getData("cuda"), "cuda", "cpu");
+      _vec_x->update(_vec_x->getData(ReSolve::memory::DEVICE), ReSolve::memory::DEVICE, ReSolve::memory::HOST);
     }
     else if (_method == resolve_rf)
     {
       // Copy rhs_vals to vec_rhs cuda
-      _vec_rhs->update(rhs_vals, "cpu", "cuda");
+      _vec_rhs->update(rhs_vals, ReSolve::memory::HOST, ReSolve::memory::DEVICE);
       int status = _resolve_Rf->solve(_vec_rhs, _vec_x);
       if (status != 0)
       {
         std::cout << "RF solve status: " << status << std::endl;
       }
       // Copy vec_x cuda to vec_x in cpu
-      _vec_x->update(_vec_x->getData("cuda"), "cuda", "cpu");
+      _vec_x->update(_vec_x->getData(ReSolve::memory::DEVICE), ReSolve::memory::DEVICE, ReSolve::memory::HOST);
     }
     else if (_method == resolve_rf_fgmres)
     {
       // Copy rhs_vals to vec_rhs cuda
-      _vec_rhs->update(rhs_vals, "cpu", "cuda");
+      _vec_rhs->update(rhs_vals, ReSolve::memory::HOST, ReSolve::memory::DEVICE);
       int status = _resolve_Rf->solve(_vec_rhs, _vec_x);
       if (status != 0)
       {
@@ -433,12 +434,12 @@ ESymSolverStatus ReSolveSolverInterface::MultiSolve(bool new_matrix, const Index
         std::cout << "RF_FGMRES solve status: " << status << std::endl;
       }
       // Copy vec_x cuda to vec_x in cpu
-      _vec_x->update(_vec_x->getData("cuda"), "cuda", "cpu");
+      _vec_x->update(_vec_x->getData(ReSolve::memory::DEVICE), ReSolve::memory::DEVICE, ReSolve::memory::HOST);
     }
     else
     {
       // Copy rhs_vals to vec_rhs cuda
-      _vec_rhs->update(rhs_vals, "cpu", "cpu");
+      _vec_rhs->update(rhs_vals, ReSolve::memory::HOST, ReSolve::memory::HOST);
       int status = _resolve_KLU->solve(_vec_rhs, _vec_x);
       if (status != 0)
       {
@@ -448,7 +449,7 @@ ESymSolverStatus ReSolveSolverInterface::MultiSolve(bool new_matrix, const Index
   }
 
   // copy vec_x to rhs_vals
-  std::memcpy(rhs_vals, _vec_x->getData("cpu"), (_ndim) * sizeof(ReSolve::real_type));
+  memcpy(rhs_vals, _vec_x->getData(ReSolve::memory::HOST), (_ndim) * sizeof(ReSolve::real_type));
 
   if (HaveIpData())
   {
@@ -467,7 +468,7 @@ Number* ReSolveSolverInterface::GetValuesArrayPtr()
   DBG_START_METH("ReSolveSolverInterface::GetValuesArrayPtr", dbg_verbosity);
   DBG_ASSERT(_initialized);
 
-  return _A->getValues("cpu");
+  return _A->getValues(ReSolve::memory::HOST);
 }
 
 Index ReSolveSolverInterface::NumberOfNegEVals() const

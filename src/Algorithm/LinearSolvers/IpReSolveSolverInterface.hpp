@@ -120,6 +120,7 @@ private:
   ReSolve::LinAlgWorkspaceCUDA* _workspace_CUDA;
   ReSolve::LinSolverDirectCuSolverGLU* _resolve_GLU;
   ReSolve::LinSolverDirectCuSolverRf* _resolve_Rf;
+  ReSolve::GramSchmidt* _GS;
   ReSolve::LinSolverIterativeFGMRES* _resolve_FGMRES;
 
   ReSolve::MatrixHandler* _matrix_handler;
