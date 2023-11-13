@@ -16,7 +16,7 @@ namespace Ipopt
 static const Index dbg_verbosity = 0;
 #endif
 
-KLUSolverInterface::KLUSolverInterface() : _val(NULL)
+KLUSolverInterface::KLUSolverInterface() : _val(NULL), _Numeric(NULL)
 {
     DBG_START_METH("KLUSolverInterface::KLUSolverInterface()", dbg_verbosity);
 }
@@ -105,6 +105,8 @@ ESymSolverStatus KLUSolverInterface::MultiSolve(bool new_matrix, const Index *ia
 {
     DBG_START_METH("KLUSolverInterface::MultiSolve", dbg_verbosity);
 
+    bool full_factor_done = false;
+
     if (_factorize)
     {
         // perform the factorization
@@ -112,6 +114,7 @@ ESymSolverStatus KLUSolverInterface::MultiSolve(bool new_matrix, const Index *ia
         {
             IpData().TimingStats().LinearSystemFactorization().Start();
         }
+        klu_free_numeric(&_Numeric, &_Common);
         _Numeric = klu_factor(_Ai, _Aj, _val, _Symbolic, &_Common);
         if (HaveIpData())
         {
@@ -123,6 +126,7 @@ ESymSolverStatus KLUSolverInterface::MultiSolve(bool new_matrix, const Index *ia
             return SYMSOLVER_FATAL_ERROR; // Matrix singular or error occurred
         }
         _factorize = false;
+        full_factor_done = true;
     }
 
     if (_pivtol_changed)
@@ -162,7 +166,32 @@ ESymSolverStatus KLUSolverInterface::MultiSolve(bool new_matrix, const Index *ia
         IpData().TimingStats().LinearSystemBackSolve().Start();
     }
 
+    // klu_rcond(_Symbolic, _Numeric, &_Common);
+    // printf("RCond: %12.8e\n", _Common.rcond);
+    // klu_condest(_Ai, _val, _Symbolic, _Numeric, &_Common);
+    // printf("Condest: %12.8e\n", _Common.condest);
+
+    klu_rcond(_Symbolic, _Numeric, &_Common);
+    if (_Common.rcond < 1e-128)
+    {
+        if (full_factor_done)
+        {
+            return SYMSOLVER_SINGULAR;
+        }
+        else
+        {
+            // refactor effectively failed -- need to call again
+            // and do full factorization
+            _factorize = true;
+            printf("RCond: %12.8e\n", _Common.rcond);
+            printf("Need to do full factorization again.\n");
+            DBG_PRINT((1, "Ask caller to call again.\n"))
+            return SYMSOLVER_CALL_AGAIN;
+        }
+    }
+
     klu_solve(_Symbolic, _Numeric, _ndim, nrhs, rhs_vals, &_Common);
+    // printf("KLU Solve Status: %d\n", sts);
 
     if (HaveIpData())
     {
