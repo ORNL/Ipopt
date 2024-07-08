@@ -16,15 +16,17 @@ namespace Ipopt
 static const Index dbg_verbosity = 0;
 #endif
 
-ReSolveSolverInterface::ReSolveSolverInterface() : _val(NULL)
+ReSolveSolverInterface::ReSolveSolverInterface() : val_(NULL)
 {
   DBG_START_METH("ReSolveSolverInterface::ReSolveSolverInterface()", dbg_verbosity);
+  rcond_val_ = 1e-128;
+  factor_by_t_ = 2;
 }
 
 ReSolveSolverInterface::~ReSolveSolverInterface()
 {
   DBG_START_METH("ReSolveSolverInterface::~ReSolveSolverInterface()", dbg_verbosity);
-  delete[] _val;
+  delete[] val_;
 }
 
 void ReSolveSolverInterface::RegisterOptions(SmartPtr<RegisteredOptions> roptions)
@@ -66,21 +68,39 @@ void ReSolveSolverInterface::RegisterOptions(SmartPtr<RegisteredOptions> roption
                              "ordering if P and Q are NULL), or 3 for the user order function.",
                              false);
 
-  // roptions->AddIntegerOption(
-  //     "resolve_btf", "Use BTF", 1,
-  //     "if nonzero, then BTF is used to permute the input matrix into block upper triangular form.", false);
+  roptions->AddIntegerOption("resolve_btf",                                                                                //
+                             "Use BTF",                                                                                    //
+                             1,                                                                                            //
+                             "if nonzero, then BTF is used to permute the input matrix into block upper triangular form.", //
+                             false);
 
-  // roptions->AddIntegerOption(
-  //     "resolve_scale", "Whether or not the matrix should be scaled", 2,
-  //     "If scale < 0, then no scaling is performed and the input matrix is not checked for errors. If scale >= 0,
-  //     the " "input matrix is check for errors. If scale=0, then no scaling is performed. If scale=1, then each row
-  //     of A is " "divided by the sum of the absolute values in that row. If scale=2, then each row of A is divided
-  //     by the " "maximum absolute value in that row. Default: 2.", false);
+  roptions->AddIntegerOption("resolve_scale",                              //
+                             "Whether or not the matrix should be scaled", //
+                             2,                                            //
+                             "If scale < 0, then no scaling is performed and the input matrix is not checked for errors. If scale >= 0, the input matrix is check for errors. If scale=0, then no scaling is performed. If scale=1, then each row of A is "
+                             "divided by the sum of the absolute values in that row. If scale=2, then each row of A is divided by the maximum absolute value in that row. Default: 2.", //
+                             false);
 
   roptions->AddBoolOption("resolve_halt_if_singular",        //
                           "how to handle a singular matrix", //
                           false,                             // Default is False in ReSolve
                           "FALSE: keep going, TRUE: stop quickly.", false);
+
+  roptions->AddIntegerOption("resolve_n_skip_refactoring",                      //
+                             "How many iterations to skip refactoring",         //
+                             1,                                                 //
+                             "Integer, Start Refactoring after k-th iteration", //
+                             false);
+
+  roptions->AddBoolOption("resolve_use_rcond", //
+                          "If you use rcond",  //
+                          false,               // Default is False in ReSolve
+                          "FALSE: don't use rcond, TRUE: use rcond.", false);
+
+  roptions->AddNumberOption("resolve_rcond_val",       //
+                            "ReSolve KLU RCond Value", //
+                            1e-128,                    //
+                            "RCond Value to initiate KLU Factorize Again", false);
 }
 
 bool ReSolveSolverInterface::InitializeImpl(const OptionsList& options, const std::string& prefix)
@@ -91,45 +111,68 @@ bool ReSolveSolverInterface::InitializeImpl(const OptionsList& options, const st
   Index order_method;
   options.GetIntegerValue("resolve_ordering", order_method, prefix);
 
-  // Index btf;
-  // options.GetIntegerValue("resolve_btf", btf, prefix);
+  Index btf;
+  options.GetIntegerValue("resolve_btf", btf, prefix);
 
-  // Index scale;
-  // options.GetIntegerValue("resolve_scale", scale, prefix);
+  Index scale;
+  options.GetIntegerValue("resolve_scale", scale, prefix);
+
+  Index n_skip_refactoring;
+  options.GetIntegerValue("resolve_n_skip_refactoring", n_skip_refactoring, prefix);
+  k_ = n_skip_refactoring;
 
   bool halt_if_singular;
   options.GetBoolValue("resolve_halt_if_singular", halt_if_singular, prefix);
 
   std::string method;
   options.GetStringValue("resolve_method", method, prefix);
-  _method = method;
+  method_ = method;
 
-  _resolve_KLU = new ReSolve::LinSolverDirectKLU();
-  //_resolve_KLU->setupParameters(order_method, tol, halt_if_singular);
+  options.GetNumericValue("resolve_rcond_val", rcond_val_, prefix);
+  options.GetBoolValue("resolve_use_rcond", use_rcond_, prefix);
 
-  if (_method == resolve_glu)
+  if (method_ == resolve_glu)
   {
-    _workspace_CUDA = new ReSolve::LinAlgWorkspaceCUDA();
-    _workspace_CUDA->initializeHandles();
-    _resolve_GLU = new ReSolve::LinSolverDirectCuSolverGLU(_workspace_CUDA);
+    workspace_CUDA_ = new ReSolve::LinAlgWorkspaceCUDA;
+    workspace_CUDA_->initializeHandles();
+
+    matrix_handler_ = new ReSolve::MatrixHandler(workspace_CUDA_);
+    vector_handler_ = new ReSolve::VectorHandler(workspace_CUDA_);
+
+    resolve_KLU_ = new ReSolve::LinSolverDirectKLU;
+    resolve_GLU_ = new ReSolve::LinSolverDirectCuSolverGLU(workspace_CUDA_);
   }
-  else if (_method == resolve_rf)
+  else if (method_ == resolve_rf)
   {
-    _workspace_CUDA = new ReSolve::LinAlgWorkspaceCUDA();
-    _workspace_CUDA->initializeHandles();
-    _resolve_Rf = new ReSolve::LinSolverDirectCuSolverRf();
-    _matrix_handler = new ReSolve::MatrixHandler(_workspace_CUDA);
-    _vector_handler = new ReSolve::VectorHandler(_workspace_CUDA);
+    workspace_CUDA_ = new ReSolve::LinAlgWorkspaceCUDA;
+    workspace_CUDA_->initializeHandles();
+
+    matrix_handler_ = new ReSolve::MatrixHandler(workspace_CUDA_);
+    vector_handler_ = new ReSolve::VectorHandler(workspace_CUDA_);
+
+    resolve_KLU_ = new ReSolve::LinSolverDirectKLU;
+    resolve_Rf_ = new ReSolve::LinSolverDirectCuSolverRf();
   }
-  else if (_method == resolve_rf_fgmres)
+  else if (method_ == resolve_rf_fgmres)
   {
-    _workspace_CUDA = new ReSolve::LinAlgWorkspaceCUDA();
-    _workspace_CUDA->initializeHandles();
-    _resolve_Rf = new ReSolve::LinSolverDirectCuSolverRf();
-    _matrix_handler = new ReSolve::MatrixHandler(_workspace_CUDA);
-    _vector_handler = new ReSolve::VectorHandler(_workspace_CUDA);
-    _GS = new ReSolve::GramSchmidt(_vector_handler, ReSolve::GramSchmidt::cgs2);
-    _resolve_FGMRES = new ReSolve::LinSolverIterativeFGMRES(_matrix_handler, _vector_handler, _GS);
+    workspace_CUDA_ = new ReSolve::LinAlgWorkspaceCUDA;
+    workspace_CUDA_->initializeHandles();
+
+    matrix_handler_ = new ReSolve::MatrixHandler(workspace_CUDA_);
+    vector_handler_ = new ReSolve::VectorHandler(workspace_CUDA_);
+
+    resolve_KLU_ = new ReSolve::LinSolverDirectKLU;
+    resolve_Rf_ = new ReSolve::LinSolverDirectCuSolverRf;
+    GS_ = new ReSolve::GramSchmidt(vector_handler_, ReSolve::GramSchmidt::cgs2);
+    resolve_FGMRES_ = new ReSolve::LinSolverIterativeFGMRES(matrix_handler_, vector_handler_, GS_);
+  }
+  else if (method_ == resolve_klu)
+  {
+    workspace_CPU_ = new ReSolve::LinAlgWorkspaceCpu();
+    matrix_handler_ = new ReSolve::MatrixHandler(workspace_CPU_);
+    vector_handler_ = new ReSolve::VectorHandler(workspace_CPU_);
+
+    resolve_KLU_ = new ReSolve::LinSolverDirectKLU;
   }
 
   return true;
@@ -141,50 +184,33 @@ ESymSolverStatus ReSolveSolverInterface::InitializeStructure(Index dim, Index no
   DBG_START_METH("ReSolveSolverInterface::InitializeStructure", dbg_verbosity);
 
   ESymSolverStatus retval = SYMSOLVER_SUCCESS;
-  // printf("dim: %d, nonzeros %d\n", dim, nonzeros);
+  printf("dim: %d, nonzeros %d\n", dim, nonzeros);
 
   // Store size for later use
-  _ndim = dim;
-  _nonzeros = nonzeros;
+  ndim_ = dim;
+  nonzeros_ = nonzeros;
+  printf("Using Refactorization after %d iterations\n\n", k_);
 
-  _A = new ReSolve::matrix::Csr(dim, dim, nonzeros);
-  if (_val != NULL)
+  A_ = new ReSolve::matrix::Csr(dim, dim, nonzeros);
+  if (val_ != NULL)
   {
-    delete[] _val;
+    delete[] val_;
   }
-  _val = new Number[nonzeros];
+  val_ = new Number[nonzeros];
 
-  _A->setMatrixData(const_cast<int*>(ia), const_cast<int*>(ja), _val, ReSolve::memory::HOST);
+  A_->setMatrixData(const_cast<int*>(ia), const_cast<int*>(ja), val_, ReSolve::memory::HOST);
+  resolve_KLU_->setup(A_);
 
-  _resolve_KLU->setup(_A);
+  vec_rhs_ = new ReSolve::vector::Vector(A_->getNumRows());
+  vec_x_ = new ReSolve::vector::Vector(A_->getNumRows());
 
-  _vec_rhs = new ReSolve::vector::Vector(_A->getNumRows());
-  _vec_x = new ReSolve::vector::Vector(_A->getNumRows());
+  vec_x_->allocate(ReSolve::memory::HOST); // for KLU
+  // vec_x_->allocate(ReSolve::memory::DEVICE);
 
-  _vec_x->allocate(ReSolve::memory::HOST); // for KLU
-  _vec_x->allocate(ReSolve::memory::DEVICE);
+  factorize_ = true;
+  n_iteration_ = 0;
 
-  if (HaveIpData())
-  {
-    IpData().TimingStats().LinearSystemSymbolicFactorization().Start();
-  }
-  int status = _resolve_KLU->analyze();
-  if (HaveIpData())
-  {
-    IpData().TimingStats().LinearSystemSymbolicFactorization().End();
-  }
-
-  _factorize = true;
-  _first_iteration = true;
-  _n_iteration = 0;
-
-  if (status != 0)
-  {
-    printf("Symbolic_ factorization crashed with Common_.status = %d \n", status);
-    return SYMSOLVER_FATAL_ERROR;
-  }
-
-  _initialized = true;
+  initialized_ = true;
 
   return retval;
 }
@@ -193,46 +219,85 @@ ESymSolverStatus ReSolveSolverInterface::MultiSolve(bool new_matrix, const Index
 {
   DBG_START_METH("ReSolveSolverInterface::MultiSolve", dbg_verbosity);
 
-  _A->updateData(_A->getRowData(ReSolve::memory::HOST), _A->getColData(ReSolve::memory::HOST), _A->getValues(ReSolve::memory::HOST), ReSolve::memory::HOST, ReSolve::memory::DEVICE);
+  int status;
+  int status_refactor = 0;
 
-  if (_factorize)
+  bool full_factor_done = false;
+
+  // Get Data from CPU and update the A Matrix
+  A_->updateData(A_->getRowData(ReSolve::memory::HOST), A_->getColData(ReSolve::memory::HOST), A_->getValues(ReSolve::memory::HOST), ReSolve::memory::HOST, ReSolve::memory::DEVICE);
+
+  // FACTORIZE
+
+  // Every factor_by_t_ iteration do a Factorization!!!
+  if (n_iteration_ % factor_by_t_ == 0)
   {
-    // perform the factorization
+    //factorize_ = true;
+    //re_factorize_ = true;
+  }
+
+  if (factorize_ && (new_matrix || re_factorize_))
+  {
+    // printf("Iteration: %d: Performing KLU Factorization\n", n_iteration_);
+
+    // Symbolic Factorization
+    if (HaveIpData())
+    {
+      IpData().TimingStats().LinearSystemSymbolicFactorization().Start();
+    }
+    status = resolve_KLU_->analyze();
+    if (status != 0)
+    {
+      printf("Symbolic_ factorization crashed with Common_.status = %d \n", status);
+      printf("%s:0 Singular\n", __func__);
+      return SYMSOLVER_SINGULAR;
+    }
+    if (HaveIpData())
+    {
+      IpData().TimingStats().LinearSystemSymbolicFactorization().End();
+    }
+
+    //  perform the factorization
     if (HaveIpData())
     {
       IpData().TimingStats().LinearSystemFactorization().Start();
     }
 
     // First Factorization is always done by KLU
-    int status = _resolve_KLU->factorize();
+    std::cout << "%" << n_iteration_ << "%" << "FULL FACTORIZATIOM" << std::endl;
+    status = resolve_KLU_->factorize();
+    full_factor_done = true;
+
     if (status != 0)
     {
-      if (HaveIpData())
-      {
-        IpData().TimingStats().LinearSystemFactorization().End();
-      }
-
       DBG_PRINT((1, "FACTORIZATION FAILED!\n"));
-      return SYMSOLVER_FATAL_ERROR; // Matrix singular or error occurred
+      printf("%s: Singular\n", __func__);
+      return SYMSOLVER_SINGULAR; // Matrix singular or error occurred
     }
+    // printf("Iteration: %d: Done KLU Factorization\n", n_iteration_);
 
     // GLU can be setup as early as possible
-    if (_method == resolve_glu)
+    if (n_iteration_ == k_ - 1)
     {
-      ReSolve::matrix::Sparse* L = _resolve_KLU->getLFactor();
-      ReSolve::matrix::Sparse* U = _resolve_KLU->getUFactor();
-      if (L == nullptr)
+      if (method_ == resolve_glu)
       {
-        printf("ERROR");
-      }
-      ReSolve::index_type* P = _resolve_KLU->getPOrdering();
-      ReSolve::index_type* Q = _resolve_KLU->getQOrdering();
-      _resolve_GLU->setup(_A, L, U, P, Q);
+        printf("Iteration: %d: Setting Up GLU\n", n_iteration_);
 
-      delete[] P;
-      delete[] Q;
-      delete L;
-      delete U;
+        ReSolve::matrix::Sparse* L = resolve_KLU_->getLFactor();
+        ReSolve::matrix::Sparse* U = resolve_KLU_->getUFactor();
+        if (L == nullptr)
+        {
+          printf("ERROR");
+        }
+        ReSolve::index_type* P = resolve_KLU_->getPOrdering();
+        ReSolve::index_type* Q = resolve_KLU_->getQOrdering();
+        resolve_GLU_->setup(A_, L, U, P, Q);
+
+        delete[] P;
+        delete[] Q;
+        delete L;
+        delete U;
+      }
     }
 
     if (HaveIpData())
@@ -240,27 +305,32 @@ ESymSolverStatus ReSolveSolverInterface::MultiSolve(bool new_matrix, const Index
       IpData().TimingStats().LinearSystemFactorization().End();
     }
 
-    _factorize = false;
+    // Iteration is 0 indexed. If the n_iteration_ is > 0
+    // Stop doing factorization after iteration _k
+    factorize_ = (n_iteration_ >= (k_ - 1)) ? false : true;
+    re_factorize_ = false;
+    // printf("Iteration: %d: Ending Factorization Section\n", n_iteration_);
   }
 
-  if (_pivtol_changed)
+  if (pivtol_changed_)
   {
     DBG_PRINT((1, "Pivot tolerance has changed.\n"));
-    _pivtol_changed = false;
+    pivtol_changed_ = false;
     // If the pivot tolerance has been changed but the matrix is not
     // new, we have to request the values for the matrix again to do
     // the factorization again.
     if (!new_matrix)
     {
       DBG_PRINT((1, "Ask caller to call again.\n"));
-      _re_factorize = true;
+      factorize_ = true;
       return SYMSOLVER_CALL_AGAIN;
     }
   }
 
+  // REFACTORIZE
   // check if a re-factorization has to be done
   DBG_PRINT((1, "new_matrix = %d\n", new_matrix));
-  if (!_first_iteration && (new_matrix || _re_factorize))
+  if (!full_factor_done && n_iteration_ >= k_ && (new_matrix || re_factorize_))
   {
     // perform the factorization
     if (HaveIpData())
@@ -269,70 +339,84 @@ ESymSolverStatus ReSolveSolverInterface::MultiSolve(bool new_matrix, const Index
     }
 
     // Actual Refactorize
-    if (_method == resolve_glu)
+    if (method_ == resolve_glu)
     {
-      int status = _resolve_GLU->refactorize();
+      status = resolve_GLU_->refactorize();
       if (status != 0)
       {
         std::cout << "CUSOLVER GLU refactorization status: " << status << std::endl;
       }
     }
-    else if (_method == resolve_rf)
+    else if (method_ == resolve_rf)
     {
-      int status = _resolve_Rf->refactorize();
+      status_refactor = resolve_Rf_->refactorize();
+      if (status != 0)
+      {
+        std::cout << "CUSOLVER RF refactorization status: " << status_refactor << std::endl;
+      }
+    }
+    else if (method_ == resolve_rf_fgmres)
+    {
+      status = resolve_Rf_->refactorize();
       if (status != 0)
       {
         std::cout << "CUSOLVER RF refactorization status: " << status << std::endl;
       }
     }
-    else if (_method == resolve_rf_fgmres)
+    else if (method_ == resolve_klu)
     {
-      int status = _resolve_Rf->refactorize();
-      if (status != 0)
-      {
-        std::cout << "CUSOLVER RF refactorization status: " << status << std::endl;
-      }
-    }
-    else
-    {
-      int status = _resolve_KLU->refactorize();
+      std::cout << "%" << n_iteration_ << "%" << "RE-FACTORIZATIOM" << std::endl;
+      status = resolve_KLU_->refactorize();
       if (status != 0)
       {
         std::cout << "KLU refactorization status: " << status << std::endl;
       }
     }
-    _re_factorize = false;
+    re_factorize_ = false;
     if (HaveIpData())
     {
       IpData().TimingStats().LinearSystemFactorization().End();
     }
-  }
+  } // End Refactorize
 
+  // SOLVE
   if (HaveIpData())
   {
     IpData().TimingStats().LinearSystemBackSolve().Start();
   }
 
-  // First Iteration
-  if (_n_iteration == 0)
+  // First k Iterations, only do KLU
+  if (n_iteration_ < k_)
   {
-    if (_method == resolve_glu)
+    // USE KLU for up to k_ iterations
     {
-      // Copy rhs_vals to vec_rhs cuda
-      _vec_rhs->update(rhs_vals, ReSolve::memory::HOST, ReSolve::memory::DEVICE);
-      int status = _resolve_GLU->solve(_vec_rhs, _vec_x);
-      if (status != 0)
+      if (use_rcond_)
       {
-        std::cout << "GLU solve status: " << status << std::endl;
+        Number rcond_val = resolve_KLU_->getMatrixConditionNumber();
+        printf("RCond: %12.8e\n", rcond_val);
+        if (rcond_val < rcond_val_)
+        {
+          if (full_factor_done)
+          {
+            printf("%s:1 Singular\n", __func__);
+            return SYMSOLVER_SINGULAR;
+          }
+          else
+          {
+            // refactor effectively failed -- need to call again
+            // and do full factorization
+            factorize_ = true;
+            re_factorize_ = true;
+            printf("%s:1 Need to do full factorization again.\n", __func__);
+            DBG_PRINT((1, "Ask caller to call again.\n"))
+            return SYMSOLVER_CALL_AGAIN;
+          }
+        }
       }
-      // Copy vec_x cuda to vec_x in cpu
-      _vec_x->update(_vec_x->getData(ReSolve::memory::DEVICE), ReSolve::memory::DEVICE, ReSolve::memory::HOST);
-    }
-    else // USE KLU
-    {
-      // Copy rhs_vals to vec_rhs cuda
-      _vec_rhs->update(rhs_vals, ReSolve::memory::DEVICE, ReSolve::memory::DEVICE);
-      int status = _resolve_KLU->solve(_vec_rhs, _vec_x);
+
+      // Copy rhs_vals to vec_rhs
+      vec_rhs_->update(rhs_vals, ReSolve::memory::HOST, ReSolve::memory::HOST);
+      status = resolve_KLU_->solve(vec_rhs_, vec_x_);
       if (status != 0)
       {
         std::cout << "KLU solve status: " << status << std::endl;
@@ -340,107 +424,145 @@ ESymSolverStatus ReSolveSolverInterface::MultiSolve(bool new_matrix, const Index
     }
 
     // Setup RF here
-    printf("Iteration: %d: Setting up %s\n", _n_iteration, _method.c_str());
-    if (_method == resolve_rf)
+    if (n_iteration_ == (k_ - 1))
     {
-      ReSolve::matrix::Csc* L_csc = (ReSolve::matrix::Csc*)_resolve_KLU->getLFactor();
-      ReSolve::matrix::Csc* U_csc = (ReSolve::matrix::Csc*)_resolve_KLU->getUFactor();
-      ReSolve::matrix::Csr* L = new ReSolve::matrix::Csr(L_csc->getNumRows(), L_csc->getNumColumns(), L_csc->getNnz());
-      ReSolve::matrix::Csr* U = new ReSolve::matrix::Csr(U_csc->getNumRows(), U_csc->getNumColumns(), U_csc->getNnz());
-      _matrix_handler->csc2csr(L_csc, L, ReSolve::memory::DEVICE);
-      _matrix_handler->csc2csr(U_csc, U, ReSolve::memory::DEVICE);
-      if (L == nullptr)
+      if (method_ == resolve_rf)
       {
-        printf("ERROR");
-      }
-      ReSolve::index_type* P = _resolve_KLU->getPOrdering();
-      ReSolve::index_type* Q = _resolve_KLU->getQOrdering();
-      _resolve_Rf->setup(_A, L, U, P, Q);
+        printf("Iteration: %d: Setting up %s\n", n_iteration_, method_.c_str());
+        ReSolve::matrix::Csc* L_csc = (ReSolve::matrix::Csc*)resolve_KLU_->getLFactor();
+        ReSolve::matrix::Csc* U_csc = (ReSolve::matrix::Csc*)resolve_KLU_->getUFactor();
+        ReSolve::matrix::Csr* L = new ReSolve::matrix::Csr(L_csc->getNumRows(), L_csc->getNumColumns(), L_csc->getNnz());
+        ReSolve::matrix::Csr* U = new ReSolve::matrix::Csr(U_csc->getNumRows(), U_csc->getNumColumns(), U_csc->getNnz());
+        matrix_handler_->csc2csr(L_csc, L, ReSolve::memory::DEVICE);
+        matrix_handler_->csc2csr(U_csc, U, ReSolve::memory::DEVICE);
+        if (L == nullptr)
+        {
+          printf("ERROR");
+        }
+        ReSolve::index_type* P = resolve_KLU_->getPOrdering();
+        ReSolve::index_type* Q = resolve_KLU_->getQOrdering();
+        resolve_Rf_->setup(A_, L, U, P, Q);
 
-      delete[] P;
-      delete[] Q;
-      delete L;
-      delete L_csc;
-      delete U;
-      delete U_csc;
-    }
-    else if (_method == resolve_rf_fgmres)
-    {
-      ReSolve::matrix::Csc* L_csc = (ReSolve::matrix::Csc*)_resolve_KLU->getLFactor();
-      ReSolve::matrix::Csc* U_csc = (ReSolve::matrix::Csc*)_resolve_KLU->getUFactor();
-      ReSolve::matrix::Csr* L = new ReSolve::matrix::Csr(L_csc->getNumRows(), L_csc->getNumColumns(), L_csc->getNnz());
-      ReSolve::matrix::Csr* U = new ReSolve::matrix::Csr(U_csc->getNumRows(), U_csc->getNumColumns(), U_csc->getNnz());
-      _matrix_handler->csc2csr(L_csc, L, ReSolve::memory::DEVICE);
-      _matrix_handler->csc2csr(U_csc, U, ReSolve::memory::DEVICE);
-      if (L == nullptr)
+        delete[] P;
+        delete[] Q;
+        delete L;
+        delete L_csc;
+        delete U;
+        delete U_csc;
+      }
+      else if (method_ == resolve_rf_fgmres)
       {
-        printf("ERROR");
-      }
-      ReSolve::index_type* P = _resolve_KLU->getPOrdering();
-      ReSolve::index_type* Q = _resolve_KLU->getQOrdering();
-      _resolve_Rf->setup(_A, L, U, P, Q);
-      _resolve_FGMRES->setup(_A);
-      _resolve_FGMRES->setupPreconditioner("CuSolverRf", _resolve_Rf);
-      // _resolve_FGMRES->resetMatrix(_A);
+        printf("Iteration: %d: Setting up %s\n", n_iteration_, method_.c_str());
 
-      delete[] P;
-      delete[] Q;
-      delete L;
-      delete L_csc;
-      delete U;
-      delete U_csc;
+        ReSolve::matrix::Csc* L_csc = (ReSolve::matrix::Csc*)resolve_KLU_->getLFactor();
+        ReSolve::matrix::Csc* U_csc = (ReSolve::matrix::Csc*)resolve_KLU_->getUFactor();
+        ReSolve::matrix::Csr* L = new ReSolve::matrix::Csr(L_csc->getNumRows(), L_csc->getNumColumns(), L_csc->getNnz());
+        ReSolve::matrix::Csr* U = new ReSolve::matrix::Csr(U_csc->getNumRows(), U_csc->getNumColumns(), U_csc->getNnz());
+        matrix_handler_->csc2csr(L_csc, L, ReSolve::memory::DEVICE);
+        matrix_handler_->csc2csr(U_csc, U, ReSolve::memory::DEVICE);
+        if (L == nullptr)
+        {
+          printf("ERROR");
+        }
+        ReSolve::index_type* P = resolve_KLU_->getPOrdering();
+        ReSolve::index_type* Q = resolve_KLU_->getQOrdering();
+        resolve_Rf_->setup(A_, L, U, P, Q);
+        resolve_FGMRES_->setup(A_);
+        resolve_FGMRES_->setupPreconditioner("CuSolverRf", resolve_Rf_);
+        // _resolve_FGMRES->resetMatrix(A_);
+
+        delete[] P;
+        delete[] Q;
+        delete L;
+        delete L_csc;
+        delete U;
+        delete U_csc;
+      }
     }
   }
-  else // After 1st iteration
+  else // After k iteration only solve
   {
-    if (_method == resolve_glu)
+
+    //Every 10 iteration setup again with full factorization? Already factorization done.
+
+
+    if (method_ == resolve_glu)
     {
       // Copy rhs_vals to vec_rhs cuda
-      _vec_rhs->update(rhs_vals, ReSolve::memory::HOST, ReSolve::memory::DEVICE);
-      int status = _resolve_GLU->solve(_vec_rhs, _vec_x);
+      vec_rhs_->update(rhs_vals, ReSolve::memory::HOST, ReSolve::memory::DEVICE);
+      status = resolve_GLU_->solve(vec_rhs_, vec_x_);
       if (status != 0)
       {
         std::cout << "GLU solve status: " << status << std::endl;
       }
       // Copy vec_x cuda to vec_x in cpu
-      _vec_x->update(_vec_x->getData(ReSolve::memory::DEVICE), ReSolve::memory::DEVICE, ReSolve::memory::HOST);
+      vec_x_->update(vec_x_->getData(ReSolve::memory::DEVICE), ReSolve::memory::DEVICE, ReSolve::memory::HOST);
     }
-    else if (_method == resolve_rf)
+    else if (method_ == resolve_rf)
     {
       // Copy rhs_vals to vec_rhs cuda
-      _vec_rhs->update(rhs_vals, ReSolve::memory::HOST, ReSolve::memory::DEVICE);
-      int status = _resolve_Rf->solve(_vec_rhs, _vec_x);
+      vec_rhs_->update(rhs_vals, ReSolve::memory::HOST, ReSolve::memory::DEVICE);
+      status = resolve_Rf_->solve(vec_rhs_, vec_x_);
       if (status != 0)
       {
         std::cout << "RF solve status: " << status << std::endl;
       }
       // Copy vec_x cuda to vec_x in cpu
-      _vec_x->update(_vec_x->getData(ReSolve::memory::DEVICE), ReSolve::memory::DEVICE, ReSolve::memory::HOST);
+      vec_x_->update(vec_x_->getData(ReSolve::memory::DEVICE), ReSolve::memory::DEVICE, ReSolve::memory::HOST);
+
+      // Copy original RHS values to _vec_r
+      // vec_r_->update(rhs_vals, ReSolve::memory::HOST, ReSolve::memory::DEVICE);
+      matrix_handler_->setValuesChanged(true, ReSolve::memory::DEVICE);
     }
-    else if (_method == resolve_rf_fgmres)
+    else if (method_ == resolve_rf_fgmres)
     {
       // Copy rhs_vals to vec_rhs cuda
-      _vec_rhs->update(rhs_vals, ReSolve::memory::HOST, ReSolve::memory::DEVICE);
-      int status = _resolve_Rf->solve(_vec_rhs, _vec_x);
+      vec_rhs_->update(rhs_vals, ReSolve::memory::HOST, ReSolve::memory::DEVICE);
+      int status = resolve_Rf_->solve(vec_rhs_, vec_x_);
       if (status != 0)
       {
         std::cout << "RF solve status: " << status << std::endl;
       }
 
-      _resolve_FGMRES->resetMatrix(_A);
-      status = _resolve_FGMRES->solve(_vec_rhs, _vec_x);
+      resolve_FGMRES_->resetMatrix(A_);
+      status = resolve_FGMRES_->solve(vec_rhs_, vec_x_);
       if (status != 0)
       {
         std::cout << "RF_FGMRES solve status: " << status << std::endl;
       }
       // Copy vec_x cuda to vec_x in cpu
-      _vec_x->update(_vec_x->getData(ReSolve::memory::DEVICE), ReSolve::memory::DEVICE, ReSolve::memory::HOST);
+      vec_x_->update(vec_x_->getData(ReSolve::memory::DEVICE), ReSolve::memory::DEVICE, ReSolve::memory::HOST);
     }
-    else
+    else if (method_ == resolve_klu)
     {
+      // Solve using KLU
+      if (use_rcond_)
+      {
+        Number rcond_val = resolve_KLU_->getMatrixConditionNumber();
+        printf("RCond: %12.8e\n", rcond_val);
+        if (rcond_val < rcond_val_)
+        {
+          if (full_factor_done)
+          {
+            printf("%s:2 Singular\n", __func__);
+            return SYMSOLVER_SINGULAR;
+          }
+          else
+          {
+            // refactor effectively failed -- need to call again
+            // and do full factorization
+            factorize_ = true;
+            re_factorize_ = true;
+            printf("Need to do full factorization again.\n");
+            DBG_PRINT((1, "Ask caller to call again.\n"))
+            return SYMSOLVER_CALL_AGAIN;
+          }
+        }
+      }
+
       // Copy rhs_vals to vec_rhs cuda
-      _vec_rhs->update(rhs_vals, ReSolve::memory::HOST, ReSolve::memory::HOST);
-      int status = _resolve_KLU->solve(_vec_rhs, _vec_x);
+      vec_rhs_->update(rhs_vals, ReSolve::memory::HOST, ReSolve::memory::HOST);
+      int status = resolve_KLU_->solve(vec_rhs_, vec_x_);
       if (status != 0)
       {
         std::cout << "KLU solve status: " << status << std::endl;
@@ -449,16 +571,14 @@ ESymSolverStatus ReSolveSolverInterface::MultiSolve(bool new_matrix, const Index
   }
 
   // copy vec_x to rhs_vals
-  memcpy(rhs_vals, _vec_x->getData(ReSolve::memory::HOST), (_ndim) * sizeof(ReSolve::real_type));
+  memcpy(rhs_vals, vec_x_->getData(ReSolve::memory::HOST), (ndim_) * sizeof(ReSolve::real_type));
 
   if (HaveIpData())
   {
     IpData().TimingStats().LinearSystemBackSolve().End();
   }
 
-  // Setup Rf at first iteration
-  _n_iteration += 1;
-  _first_iteration = false;
+  n_iteration_ += 1;
 
   return SYMSOLVER_SUCCESS;
 }
@@ -468,12 +588,12 @@ Number* ReSolveSolverInterface::GetValuesArrayPtr()
   DBG_START_METH("ReSolveSolverInterface::GetValuesArrayPtr", dbg_verbosity);
   DBG_ASSERT(_initialized);
 
-  return _A->getValues(ReSolve::memory::HOST);
+  return A_->getValues(ReSolve::memory::HOST);
 }
 
 Index ReSolveSolverInterface::NumberOfNegEVals() const
 {
-  return _numneg;
+  return numneg_;
 }
 
 bool ReSolveSolverInterface::IncreaseQuality()

@@ -10,10 +10,7 @@
 #include <fstream>
 #include <iomanip>
 #include <iostream>
-#include <resolve/LinSolverDirectCuSolverGLU.hpp>
-#include <resolve/LinSolverDirectCuSolverRf.hpp>
-#include <resolve/LinSolverDirectKLU.hpp>
-#include <resolve/LinSolverIterativeFGMRES.hpp>
+
 #include <resolve/matrix/Coo.hpp>
 #include <resolve/matrix/Csr.hpp>
 #include <resolve/matrix/Csc.hpp>
@@ -21,13 +18,21 @@
 #include <resolve/matrix/io.hpp>
 #include <resolve/matrix/MatrixHandler.hpp>
 #include <resolve/vector/VectorHandler.hpp>
+
+#include <resolve/LinSolverDirectKLU.hpp>
+#include <resolve/LinSolverDirectCuSolverGLU.hpp>
+#include <resolve/LinSolverDirectCuSolverRf.hpp>
+#include <resolve/LinSolverIterativeFGMRES.hpp>
+
 #include <resolve/workspace/LinAlgWorkspace.hpp>
+
 #include <sstream>
 #include <string>
 
 #include "IpLibraryLoader.hpp"
 #include "IpSparseSymLinearSolverInterface.hpp"
 #include "IpTypes.h"
+using namespace ReSolve::constants;
 
 namespace Ipopt
 {
@@ -101,31 +106,37 @@ private:
   ///@}
 
   /** Number of nonzeros of the matrix */
-  Index _nonzeros;
+  Index nonzeros_;
 
-  bool _initialized;
-  Index _ndim;          ///< Number of dimensions
-  Number* _val;         ///< Storage for variables
-  Index _numneg;        ///< Number of negative pivots in last factorization
-  bool _pivtol_changed; ///< indicates if pivtol has been changed
-  bool _re_factorize;
-  bool _factorize;
-  bool _first_iteration;
-  std::string _method;
-  int _n_iteration;
+  bool initialized_;
+  Index ndim_;          ///< Number of dimensions
+  Number* val_;         ///< Storage for variables
+  Index numneg_;        ///< Number of negative pivots in last factorization
+  bool pivtol_changed_; ///< indicates if pivtol has been changed
+  bool re_factorize_;
+  bool factorize_;
+  std::string method_;
+  int n_iteration_;
 
-  ReSolve::LinSolverDirectKLU* _resolve_KLU;
-  ReSolve::matrix::Csr* _A;
-  ReSolve::vector::Vector* _vec_rhs;
-  ReSolve::vector::Vector* _vec_x;
-  ReSolve::LinAlgWorkspaceCUDA* _workspace_CUDA;
-  ReSolve::LinSolverDirectCuSolverGLU* _resolve_GLU;
-  ReSolve::LinSolverDirectCuSolverRf* _resolve_Rf;
-  ReSolve::GramSchmidt* _GS;
-  ReSolve::LinSolverIterativeFGMRES* _resolve_FGMRES;
+  int k_;
+  Number rcond_val_;
+  bool use_rcond_;
 
-  ReSolve::MatrixHandler* _matrix_handler;
-  ReSolve::VectorHandler* _vector_handler;
+  int factor_by_t_;
+
+  ReSolve::LinSolverDirectKLU* resolve_KLU_;
+  ReSolve::matrix::Csr* A_;
+  ReSolve::vector::Vector* vec_rhs_;
+  ReSolve::vector::Vector* vec_x_;
+  ReSolve::LinAlgWorkspaceCUDA* workspace_CUDA_;
+  ReSolve::LinAlgWorkspaceCpu* workspace_CPU_;
+  ReSolve::LinSolverDirectCuSolverGLU* resolve_GLU_;
+  ReSolve::LinSolverDirectCuSolverRf* resolve_Rf_;
+  ReSolve::GramSchmidt* GS_;
+  ReSolve::LinSolverIterativeFGMRES* resolve_FGMRES_;
+
+  ReSolve::MatrixHandler* matrix_handler_;
+  ReSolve::VectorHandler* vector_handler_;
 };
 
 } // namespace Ipopt
