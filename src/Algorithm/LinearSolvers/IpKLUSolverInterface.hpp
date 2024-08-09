@@ -94,6 +94,7 @@ class KLUSolverInterface : public SparseSymLinearSolverInterface
     bool _re_factorize;
     bool _factorize;
     bool _first_iteration;
+    Number _rcond_val;
 
     klu_symbolic *_Symbolic;
     klu_numeric *_Numeric;

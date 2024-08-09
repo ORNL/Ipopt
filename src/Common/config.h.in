@@ -116,6 +116,10 @@
 /* Define to 1 if the ReSolve package is available */
 #undef IPOPT_HAS_RESOLVE
 
+/* Define to 1 if the ReSolve package is available */
+#undef RESOLVE_WITH_CUDA
+#undef RESOLVE_WITH_HIP
+
 /* Define to 1 if the LAPACK package is available */
 #undef IPOPT_HAS_LAPACK
 

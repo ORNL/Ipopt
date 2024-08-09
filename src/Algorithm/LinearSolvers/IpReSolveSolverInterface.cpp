@@ -21,6 +21,15 @@ ReSolveSolverInterface::ReSolveSolverInterface() : val_(NULL)
   DBG_START_METH("ReSolveSolverInterface::ReSolveSolverInterface()", dbg_verbosity);
   rcond_val_ = 1e-128;
   factor_by_t_ = 2;
+
+#if RESOLVE_WITH_CUDA
+  printf("Resolve with CUDA\n");
+#elif RESOLVE_WITH_HIP
+  printf("Resolve with HIP\n");
+#else 
+  printf("Resolve with CUDA or HIP Unavailable\n");
+#endif
+
 }
 
 ReSolveSolverInterface::~ReSolveSolverInterface()
@@ -37,6 +46,7 @@ void ReSolveSolverInterface::RegisterOptions(SmartPtr<RegisteredOptions> roption
   options.push_back(resolve_klu);
   descrs.push_back("Use KLU");
 
+#if RESOLVE_WITH_CUDA
   options.push_back(resolve_glu);
   descrs.push_back("Use GLU");
 
@@ -45,6 +55,7 @@ void ReSolveSolverInterface::RegisterOptions(SmartPtr<RegisteredOptions> roption
 
   options.push_back(resolve_rf_fgmres);
   descrs.push_back("Use FGMRES");
+#endif
 
   roptions->AddStringOption("resolve_method",                               //
                             "Indicates which linear solver should be used", //
@@ -131,6 +142,7 @@ bool ReSolveSolverInterface::InitializeImpl(const OptionsList& options, const st
   options.GetNumericValue("resolve_rcond_val", rcond_val_, prefix);
   options.GetBoolValue("resolve_use_rcond", use_rcond_, prefix);
 
+#if RESOLVE_WITH_CUDA
   if (method_ == resolve_glu)
   {
     workspace_CUDA_ = new ReSolve::LinAlgWorkspaceCUDA;
@@ -166,7 +178,8 @@ bool ReSolveSolverInterface::InitializeImpl(const OptionsList& options, const st
     GS_ = new ReSolve::GramSchmidt(vector_handler_, ReSolve::GramSchmidt::cgs2);
     resolve_FGMRES_ = new ReSolve::LinSolverIterativeFGMRES(matrix_handler_, vector_handler_, GS_);
   }
-  else if (method_ == resolve_klu)
+#endif
+  if (method_ == resolve_klu)
   {
     workspace_CPU_ = new ReSolve::LinAlgWorkspaceCpu();
     matrix_handler_ = new ReSolve::MatrixHandler(workspace_CPU_);
@@ -232,8 +245,8 @@ ESymSolverStatus ReSolveSolverInterface::MultiSolve(bool new_matrix, const Index
   // Every factor_by_t_ iteration do a Factorization!!!
   if (n_iteration_ % factor_by_t_ == 0)
   {
-    //factorize_ = true;
-    //re_factorize_ = true;
+    // factorize_ = true;
+    // re_factorize_ = true;
   }
 
   if (factorize_ && (new_matrix || re_factorize_))
@@ -279,6 +292,7 @@ ESymSolverStatus ReSolveSolverInterface::MultiSolve(bool new_matrix, const Index
     // GLU can be setup as early as possible
     if (n_iteration_ == k_ - 1)
     {
+#if RESOLVE_WITH_CUDA
       if (method_ == resolve_glu)
       {
         printf("Iteration: %d: Setting Up GLU\n", n_iteration_);
@@ -298,6 +312,7 @@ ESymSolverStatus ReSolveSolverInterface::MultiSolve(bool new_matrix, const Index
         delete L;
         delete U;
       }
+#endif
     }
 
     if (HaveIpData())
@@ -338,6 +353,7 @@ ESymSolverStatus ReSolveSolverInterface::MultiSolve(bool new_matrix, const Index
       IpData().TimingStats().LinearSystemFactorization().Start();
     }
 
+#if RESOLVE_WITH_CUDA
     // Actual Refactorize
     if (method_ == resolve_glu)
     {
@@ -363,7 +379,8 @@ ESymSolverStatus ReSolveSolverInterface::MultiSolve(bool new_matrix, const Index
         std::cout << "CUSOLVER RF refactorization status: " << status << std::endl;
       }
     }
-    else if (method_ == resolve_klu)
+#endif
+    if (method_ == resolve_klu)
     {
       std::cout << "%" << n_iteration_ << "%" << "RE-FACTORIZATIOM" << std::endl;
       status = resolve_KLU_->refactorize();
@@ -426,6 +443,7 @@ ESymSolverStatus ReSolveSolverInterface::MultiSolve(bool new_matrix, const Index
     // Setup RF here
     if (n_iteration_ == (k_ - 1))
     {
+#if RESOLVE_WITH_CUDA
       if (method_ == resolve_rf)
       {
         printf("Iteration: %d: Setting up %s\n", n_iteration_, method_.c_str());
@@ -478,14 +496,15 @@ ESymSolverStatus ReSolveSolverInterface::MultiSolve(bool new_matrix, const Index
         delete U;
         delete U_csc;
       }
+#endif
     }
   }
   else // After k iteration only solve
   {
 
-    //Every 10 iteration setup again with full factorization? Already factorization done.
+    // Every 10 iteration setup again with full factorization? Already factorization done.
 
-
+#if RESOLVE_WITH_CUDA
     if (method_ == resolve_glu)
     {
       // Copy rhs_vals to vec_rhs cuda
@@ -533,7 +552,9 @@ ESymSolverStatus ReSolveSolverInterface::MultiSolve(bool new_matrix, const Index
       // Copy vec_x cuda to vec_x in cpu
       vec_x_->update(vec_x_->getData(ReSolve::memory::DEVICE), ReSolve::memory::DEVICE, ReSolve::memory::HOST);
     }
-    else if (method_ == resolve_klu)
+#endif
+
+    if (method_ == resolve_klu)
     {
       // Solve using KLU
       if (use_rcond_)

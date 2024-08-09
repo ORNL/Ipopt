@@ -11,6 +11,8 @@
 #include <iomanip>
 #include <iostream>
 
+#include "IpoptConfig.h"
+
 #include <resolve/matrix/Coo.hpp>
 #include <resolve/matrix/Csr.hpp>
 #include <resolve/matrix/Csc.hpp>
@@ -20,9 +22,16 @@
 #include <resolve/vector/VectorHandler.hpp>
 
 #include <resolve/LinSolverDirectKLU.hpp>
+
+#if RESOLVE_WITH_CUDA
 #include <resolve/LinSolverDirectCuSolverGLU.hpp>
 #include <resolve/LinSolverDirectCuSolverRf.hpp>
 #include <resolve/LinSolverIterativeFGMRES.hpp>
+#endif
+
+#if RESOLVE_WITH_HIP
+
+#endif
 
 #include <resolve/workspace/LinAlgWorkspace.hpp>
 
@@ -37,10 +46,12 @@ using namespace ReSolve::constants;
 namespace Ipopt
 {
 
-static const std::string resolve_glu = "glu";
 static const std::string resolve_klu = "klu";
+#if RESOLVE_WITH_CUDA
+static const std::string resolve_glu = "glu";
 static const std::string resolve_rf = "rf";
 static const std::string resolve_rf_fgmres = "rf_fgmres";
+#endif
 
 /** Interface to the symmetric linear solver ReSolve, derived from
  *  SparseSymLinearSolverInterface.
@@ -125,15 +136,19 @@ private:
   int factor_by_t_;
 
   ReSolve::LinSolverDirectKLU* resolve_KLU_;
+  ReSolve::LinAlgWorkspaceCpu* workspace_CPU_;
+
   ReSolve::matrix::Csr* A_;
   ReSolve::vector::Vector* vec_rhs_;
   ReSolve::vector::Vector* vec_x_;
+
+#if RESOLVE_WITH_CUDA  
   ReSolve::LinAlgWorkspaceCUDA* workspace_CUDA_;
-  ReSolve::LinAlgWorkspaceCpu* workspace_CPU_;
   ReSolve::LinSolverDirectCuSolverGLU* resolve_GLU_;
   ReSolve::LinSolverDirectCuSolverRf* resolve_Rf_;
   ReSolve::GramSchmidt* GS_;
   ReSolve::LinSolverIterativeFGMRES* resolve_FGMRES_;
+#endif
 
   ReSolve::MatrixHandler* matrix_handler_;
   ReSolve::VectorHandler* vector_handler_;

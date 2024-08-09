@@ -697,6 +697,10 @@ COIN_HAS_KLU_FALSE
 COIN_HAS_KLU_TRUE
 COIN_HAS_RESOLVE_FALSE
 COIN_HAS_RESOLVE_TRUE
+RESOLVE_HIP_FALSE
+RESOLVE_HIP_TRUE
+RESOLVE_CUDA_FALSE
+RESOLVE_CUDA_TRUE
 COIN_HAS_SPRAL_FALSE
 COIN_HAS_SPRAL_TRUE
 HAVE_PARDISO_MKL_FALSE
@@ -928,12 +932,12 @@ enable_pardisomkl
 with_spral
 with_spral_lflags
 with_spral_cflags
-with_klu
 with_klu_lflags
 with_klu_cflags
-with_resolve
 with_resolve_lflags
 with_resolve_cflags
+with_resolve_hip
+with_resolve_cuda
 with_wsmp
 enable_inexact_solver
 enable_java
@@ -25752,6 +25756,21 @@ then :
   withval=$with_resolve_cflags;
 fi
 
+with_cuda='no'
+with_hip='no'
+
+if test ${with_resolve_cuda+y}
+then :
+  with_cuda='yes';
+fi
+
+if test ${with_resolve_hip+y}
+then :
+  with_hip='yes';
+fi
+
+printf "with-cuda %s\n" "$with_cuda" >&6;
+printf "with-hip %s\n" "$with_hip" >&6;
 
   resolve_lflags="-lklu"
   resolve_cflags=""
@@ -25944,6 +25963,13 @@ printf "%s\n" "$as_me: resolve_pcfiles is \"$resolve_pcfiles\"" >&6;}
 
   if test $coin_has_resolve = yes ; then
     printf "%s\n" "#define IPOPT_HAS_RESOLVE 1" >>confdefs.h
+
+    if test $with_cuda = yes ; then
+      printf "%s\n" "#define RESOLVE_WITH_CUDA 1" >>confdefs.h
+    fi
+    if test $with_hip = yes ; then
+      printf "%s\n" "#define RESOLVE_WITH_HIP 1" >>confdefs.h
+    fi
 
     IPOPTLIB_LFLAGS="$resolve_lflags $IPOPTLIB_LFLAGS"
     IPOPTLIB_CFLAGS="$resolve_cflags $IPOPTLIB_CFLAGS"
