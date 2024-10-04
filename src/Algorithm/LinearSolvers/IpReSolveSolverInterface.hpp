@@ -31,6 +31,7 @@
 
 #if RESOLVE_WITH_HIP
 #include <resolve/LinSolverDirectRocSolverRf.hpp>
+#include <resolve/LinSolverIterativeFGMRES.hpp>
 #endif
 
 #include <resolve/workspace/LinAlgWorkspace.hpp>

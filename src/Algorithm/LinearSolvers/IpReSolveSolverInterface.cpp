@@ -188,7 +188,7 @@ bool ReSolveSolverInterface::InitializeImpl(const OptionsList& options, const st
 #endif
 
 #if RESOLVE_WITH_HIP
-  if (_method == resolve_rf)
+  if (method_ == resolve_rf)
   {
     workspace_HIP_ = new ReSolve::LinAlgWorkspaceHIP();
     workspace_HIP_->initializeHandles();
@@ -199,7 +199,7 @@ bool ReSolveSolverInterface::InitializeImpl(const OptionsList& options, const st
     resolve_KLU_ = new ReSolve::LinSolverDirectKLU();
     resolve_Rf_ = new ReSolve::LinSolverDirectRocSolverRf(workspace_HIP_);
   }
-  else if (_method == resolve_rf_fgmres)
+  else if (method_ == resolve_rf_fgmres)
   {
     workspace_HIP_ = new ReSolve::LinAlgWorkspaceHIP();
     workspace_HIP_->initializeHandles();
@@ -211,7 +211,7 @@ bool ReSolveSolverInterface::InitializeImpl(const OptionsList& options, const st
     resolve_Rf_ = new ReSolve::LinSolverDirectRocSolverRf(workspace_HIP_);
 
     GS_ = new ReSolve::GramSchmidt(vector_handler_, ReSolve::GramSchmidt::cgs2);
-    resolve_FGMRES_ = new ReSolve::LinSolverIterativeFGMRES(matrix_handler, vector_handler_, GS_);
+    resolve_FGMRES_ = new ReSolve::LinSolverIterativeFGMRES(matrix_handler_, vector_handler_, GS_);
   }
 #endif
 
@@ -555,7 +555,7 @@ ESymSolverStatus ReSolveSolverInterface::MultiSolve(bool new_matrix, const Index
 #endif
 
 #if RESOLVE_WITH_HIP
-      if (_method == resolve_rf)
+      if (method_ == resolve_rf)
       {
         ReSolve::matrix::Csc* L = (ReSolve::matrix::Csc*)resolve_KLU_->getLFactor();
         ReSolve::matrix::Csc* U = (ReSolve::matrix::Csc*)resolve_KLU_->getUFactor();
@@ -569,7 +569,7 @@ ESymSolverStatus ReSolveSolverInterface::MultiSolve(bool new_matrix, const Index
         delete L;
         delete U;
       }
-      else if (_method == resolve_rf_fgmres)
+      else if (method_ == resolve_rf_fgmres)
       {
         ReSolve::matrix::Csc* L = (ReSolve::matrix::Csc*)resolve_KLU_->getLFactor();
         ReSolve::matrix::Csc* U = (ReSolve::matrix::Csc*)resolve_KLU_->getUFactor();
