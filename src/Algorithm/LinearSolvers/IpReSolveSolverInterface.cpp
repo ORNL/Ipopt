@@ -35,6 +35,47 @@ ReSolveSolverInterface::~ReSolveSolverInterface()
 {
   DBG_START_METH("ReSolveSolverInterface::~ReSolveSolverInterface()", dbg_verbosity);
   delete[] val_;
+
+#if RESOLVE_WITH_CUDA
+  delete workspace_CUDA_;
+  delete matrix_handler__;
+  delete vector_handler__;
+  delete resolve_KLU_;
+
+  if ( method_ == resolve_glu) 
+  {
+    delete resolve_GLU_;
+  }
+  else if ( method_ == resolve_rf) 
+  {
+    delete resolve_Rf_;
+  }
+  else if ( method_ == resolve_rf_fgmres) 
+  {
+    delete resolve_Rf_;
+    delete GS_;
+    delete resolve_FGMRES_;
+  }
+
+
+#endif
+
+#if RESOLVE_WITH_HIP
+  delete workspace_HIP_;
+  delete matrix_handler__;
+  delete vector_handler__;
+  delete resolve_KLU_;
+  if (method_ == resolve_rf)
+  {
+    delete resolve_Rf_;
+  }
+  else if (method_ == resolve_rf_fgmres)
+  {
+    delete resolve_Rf_;
+    delete GS_;
+    delete resolve_FGMRES_;
+  }
+#endif
 }
 
 void ReSolveSolverInterface::RegisterOptions(SmartPtr<RegisteredOptions> roptions)
@@ -44,7 +85,6 @@ void ReSolveSolverInterface::RegisterOptions(SmartPtr<RegisteredOptions> roption
 
   options.push_back(resolve_klu);
   descrs.push_back("Use KLU");
-
 #if RESOLVE_WITH_CUDA
   options.push_back(resolve_glu);
   descrs.push_back("Use GLU");
