@@ -38,8 +38,8 @@ ReSolveSolverInterface::~ReSolveSolverInterface()
 
 #if RESOLVE_WITH_CUDA
   delete workspace_CUDA_;
-  delete matrix_handler__;
-  delete vector_handler__;
+  delete matrix_handler_;
+  delete vector_handler_;
   delete resolve_KLU_;
 
   if ( method_ == resolve_glu) 
@@ -62,8 +62,8 @@ ReSolveSolverInterface::~ReSolveSolverInterface()
 
 #if RESOLVE_WITH_HIP
   delete workspace_HIP_;
-  delete matrix_handler__;
-  delete vector_handler__;
+  delete matrix_handler_;
+  delete vector_handler_;
   delete resolve_KLU_;
   if (method_ == resolve_rf)
   {
