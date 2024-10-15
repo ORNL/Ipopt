@@ -41,7 +41,6 @@ ReSolveSolverInterface::~ReSolveSolverInterface()
   delete matrix_handler_;
   delete vector_handler_;
   delete resolve_KLU_;
-
   if ( method_ == resolve_glu) 
   {
     delete resolve_GLU_;
@@ -56,8 +55,6 @@ ReSolveSolverInterface::~ReSolveSolverInterface()
     delete GS_;
     delete resolve_FGMRES_;
   }
-
-
 #endif
 
 #if RESOLVE_WITH_HIP
@@ -77,8 +74,8 @@ ReSolveSolverInterface::~ReSolveSolverInterface()
   }
 #endif
 
-  delete [] vec_rhs_;
-  delete [] vec_x_;
+  delete vec_rhs_;
+  delete vec_x_;
   delete A_;
 }
 
