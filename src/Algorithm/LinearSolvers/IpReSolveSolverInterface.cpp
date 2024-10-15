@@ -383,11 +383,6 @@ ESymSolverStatus ReSolveSolverInterface::MultiSolve(bool new_matrix, const Index
         ReSolve::index_type* P = resolve_KLU_->getPOrdering();
         ReSolve::index_type* Q = resolve_KLU_->getQOrdering();
         resolve_GLU_->setup(A_, L, U, P, Q);
-
-        delete[] P;
-        delete[] Q;
-        delete L;
-        delete U;
       }
 #endif
     }
