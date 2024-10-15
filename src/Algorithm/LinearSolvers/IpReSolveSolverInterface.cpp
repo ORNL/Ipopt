@@ -76,10 +76,6 @@ ReSolveSolverInterface::~ReSolveSolverInterface()
     delete resolve_FGMRES_;
   }
 #endif
-
-  delete [] vec_rhs_;
-  delete [] vec_x_;
-  delete A_;
 }
 
 void ReSolveSolverInterface::RegisterOptions(SmartPtr<RegisteredOptions> roptions)
