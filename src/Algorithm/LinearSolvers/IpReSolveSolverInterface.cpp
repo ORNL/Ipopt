@@ -300,6 +300,7 @@ ESymSolverStatus ReSolveSolverInterface::InitializeStructure(Index dim, Index no
   n_iteration_ = 0;
 
   initialized_ = true;
+  pivtol_changed_ = false;
 
   return retval;
 }
