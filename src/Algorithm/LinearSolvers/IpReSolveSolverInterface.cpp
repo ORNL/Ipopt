@@ -554,12 +554,8 @@ ESymSolverStatus ReSolveSolverInterface::MultiSolve(bool new_matrix, const Index
         ReSolve::index_type* Q = resolve_KLU_->getQOrdering();
         resolve_Rf_->setup(A_, L, U, P, Q);
 
-        delete[] P;
-        delete[] Q;
         delete L;
-        delete L_csc;
         delete U;
-        delete U_csc;
       }
       else if (method_ == resolve_rf_fgmres)
       {
@@ -582,12 +578,8 @@ ESymSolverStatus ReSolveSolverInterface::MultiSolve(bool new_matrix, const Index
         resolve_FGMRES_->setupPreconditioner("CuSolverRf", resolve_Rf_);
         // _resolve_FGMRES->resetMatrix(A_);
 
-        delete[] P;
-        delete[] Q;
         delete L;
-        delete L_csc;
         delete U;
-        delete U_csc;
       }
 #endif
 
@@ -600,11 +592,6 @@ ESymSolverStatus ReSolveSolverInterface::MultiSolve(bool new_matrix, const Index
         ReSolve::index_type* Q = resolve_KLU_->getQOrdering();
         vec_rhs_->update(rhs_vals, ReSolve::memory::HOST, ReSolve::memory::DEVICE);
         resolve_Rf_->setup(A_, L, U, P, Q, vec_rhs_);
-
-        delete[] P;
-        delete[] Q;
-        delete L;
-        delete U;
       }
       else if (method_ == resolve_rf_fgmres)
       {
@@ -619,11 +606,6 @@ ESymSolverStatus ReSolveSolverInterface::MultiSolve(bool new_matrix, const Index
         GS_->setup(A_->getNumRows(), resolve_FGMRES_->getRestart());
         resolve_FGMRES_->setup(A_);
         resolve_FGMRES_->setupPreconditioner("LU", resolve_Rf_);
-
-        delete[] P;
-        delete[] Q;
-        delete L;
-        delete U;
       }
 #endif
     }
