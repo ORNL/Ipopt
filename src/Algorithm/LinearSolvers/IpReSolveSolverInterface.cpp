@@ -35,12 +35,13 @@ ReSolveSolverInterface::~ReSolveSolverInterface()
 {
   DBG_START_METH("ReSolveSolverInterface::~ReSolveSolverInterface()", dbg_verbosity);
   delete[] val_;
+  val_ = nullptr;
 
 #if RESOLVE_WITH_CUDA
   delete workspace_CUDA_;
   delete matrix_handler_;
   delete vector_handler_;
-  delete resolve_KLU_;
+  //delete resolve_KLU_; //Segfault with it
 
   if ( method_ == resolve_glu) 
   {
@@ -56,8 +57,6 @@ ReSolveSolverInterface::~ReSolveSolverInterface()
     delete GS_;
     delete resolve_FGMRES_;
   }
-
-
 #endif
 
 #if RESOLVE_WITH_HIP
@@ -192,13 +191,13 @@ bool ReSolveSolverInterface::InitializeImpl(const OptionsList& options, const st
 #if RESOLVE_WITH_CUDA
   if (method_ == resolve_glu)
   {
-    workspace_CUDA_ = new ReSolve::LinAlgWorkspaceCUDA;
+    workspace_CUDA_ = new ReSolve::LinAlgWorkspaceCUDA();
     workspace_CUDA_->initializeHandles();
 
     matrix_handler_ = new ReSolve::MatrixHandler(workspace_CUDA_);
     vector_handler_ = new ReSolve::VectorHandler(workspace_CUDA_);
 
-    resolve_KLU_ = new ReSolve::LinSolverDirectKLU;
+    resolve_KLU_ = new ReSolve::LinSolverDirectKLU();
     resolve_GLU_ = new ReSolve::LinSolverDirectCuSolverGLU(workspace_CUDA_);
   }
   else if (method_ == resolve_rf)
