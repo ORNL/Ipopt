@@ -35,6 +35,7 @@ ReSolveSolverInterface::~ReSolveSolverInterface()
 {
   DBG_START_METH("ReSolveSolverInterface::~ReSolveSolverInterface()", dbg_verbosity);
   delete[] val_;
+  val_ = nullptr;
 
 #if RESOLVE_WITH_CUDA
   delete workspace_CUDA_;
@@ -193,13 +194,13 @@ bool ReSolveSolverInterface::InitializeImpl(const OptionsList& options, const st
 #if RESOLVE_WITH_CUDA
   if (method_ == resolve_glu)
   {
-    workspace_CUDA_ = new ReSolve::LinAlgWorkspaceCUDA;
+    workspace_CUDA_ = new ReSolve::LinAlgWorkspaceCUDA();
     workspace_CUDA_->initializeHandles();
 
     matrix_handler_ = new ReSolve::MatrixHandler(workspace_CUDA_);
     vector_handler_ = new ReSolve::VectorHandler(workspace_CUDA_);
 
-    resolve_KLU_ = new ReSolve::LinSolverDirectKLU;
+    resolve_KLU_ = new ReSolve::LinSolverDirectKLU();
     resolve_GLU_ = new ReSolve::LinSolverDirectCuSolverGLU(workspace_CUDA_);
   }
   else if (method_ == resolve_rf)
