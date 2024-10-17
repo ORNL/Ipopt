@@ -24,6 +24,7 @@ ReSolveSolverInterface::ReSolveSolverInterface() : val_(NULL)
 
 #if RESOLVE_WITH_CUDA
   printf("Resolve with CUDA\n");
+  NVMLHelper::getAvailableGPUMemory();
 #elif RESOLVE_WITH_HIP
   printf("Resolve with HIP\n");
 #else
@@ -35,7 +36,6 @@ ReSolveSolverInterface::~ReSolveSolverInterface()
 {
   DBG_START_METH("ReSolveSolverInterface::~ReSolveSolverInterface()", dbg_verbosity);
   delete[] val_;
-  val_ = nullptr;
 
 #if RESOLVE_WITH_CUDA
   delete workspace_CUDA_;

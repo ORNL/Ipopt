@@ -13,6 +13,8 @@
 
 #include "IpoptConfig.h"
 
+#include "NVMLHelper.hpp"
+
 #include <resolve/matrix/Coo.hpp>
 #include <resolve/matrix/Csc.hpp>
 #include <resolve/matrix/Csr.hpp>
