@@ -21,6 +21,8 @@ ReSolveSolverInterface::ReSolveSolverInterface() : val_(NULL)
   DBG_START_METH("ReSolveSolverInterface::ReSolveSolverInterface()", dbg_verbosity);
   rcond_val_ = 1e-128;
   factor_by_t_ = 2;
+  initialized_resolve_ = false;
+  initialized_ = false;
 
 #if RESOLVE_WITH_CUDA
   printf("Resolve with CUDA\n");
@@ -34,6 +36,10 @@ ReSolveSolverInterface::ReSolveSolverInterface() : val_(NULL)
 
 ReSolveSolverInterface::~ReSolveSolverInterface()
 {
+
+  printf("Begin of Destructor\n");
+  NVMLHelper::getAvailableGPUMemory();
+
   DBG_START_METH("ReSolveSolverInterface::~ReSolveSolverInterface()", dbg_verbosity);
   delete[] val_;
 
@@ -42,15 +48,15 @@ ReSolveSolverInterface::~ReSolveSolverInterface()
   delete matrix_handler_;
   delete vector_handler_;
   delete resolve_KLU_;
-  if ( method_ == resolve_glu) 
+  if (method_ == resolve_glu)
   {
     delete resolve_GLU_;
   }
-  else if ( method_ == resolve_rf) 
+  else if (method_ == resolve_rf)
   {
     delete resolve_Rf_;
   }
-  else if ( method_ == resolve_rf_fgmres) 
+  else if (method_ == resolve_rf_fgmres)
   {
     delete resolve_Rf_;
     delete GS_;
@@ -78,6 +84,9 @@ ReSolveSolverInterface::~ReSolveSolverInterface()
   delete vec_rhs_;
   delete vec_x_;
   delete A_;
+
+  printf("End of Destructor\n");
+  NVMLHelper::getAvailableGPUMemory();
 }
 
 void ReSolveSolverInterface::RegisterOptions(SmartPtr<RegisteredOptions> roptions)
@@ -165,6 +174,9 @@ void ReSolveSolverInterface::RegisterOptions(SmartPtr<RegisteredOptions> roption
 
 bool ReSolveSolverInterface::InitializeImpl(const OptionsList& options, const std::string& prefix)
 {
+
+  // printf("ReSolveSolverInterface::InitializeImpl is Called\n");
+
   Number tol;
   options.GetNumericValue("resolve_tol", tol, prefix);
 
@@ -191,81 +203,6 @@ bool ReSolveSolverInterface::InitializeImpl(const OptionsList& options, const st
   options.GetNumericValue("resolve_rcond_val", rcond_val_, prefix);
   options.GetBoolValue("resolve_use_rcond", use_rcond_, prefix);
 
-#if RESOLVE_WITH_CUDA
-  if (method_ == resolve_glu)
-  {
-    workspace_CUDA_ = new ReSolve::LinAlgWorkspaceCUDA();
-    workspace_CUDA_->initializeHandles();
-
-    matrix_handler_ = new ReSolve::MatrixHandler(workspace_CUDA_);
-    vector_handler_ = new ReSolve::VectorHandler(workspace_CUDA_);
-
-    resolve_KLU_ = new ReSolve::LinSolverDirectKLU();
-    resolve_GLU_ = new ReSolve::LinSolverDirectCuSolverGLU(workspace_CUDA_);
-  }
-  else if (method_ == resolve_rf)
-  {
-    workspace_CUDA_ = new ReSolve::LinAlgWorkspaceCUDA;
-    workspace_CUDA_->initializeHandles();
-
-    matrix_handler_ = new ReSolve::MatrixHandler(workspace_CUDA_);
-    vector_handler_ = new ReSolve::VectorHandler(workspace_CUDA_);
-
-    resolve_KLU_ = new ReSolve::LinSolverDirectKLU;
-    resolve_Rf_ = new ReSolve::LinSolverDirectCuSolverRf();
-  }
-  else if (method_ == resolve_rf_fgmres)
-  {
-    workspace_CUDA_ = new ReSolve::LinAlgWorkspaceCUDA;
-    workspace_CUDA_->initializeHandles();
-
-    matrix_handler_ = new ReSolve::MatrixHandler(workspace_CUDA_);
-    vector_handler_ = new ReSolve::VectorHandler(workspace_CUDA_);
-
-    resolve_KLU_ = new ReSolve::LinSolverDirectKLU;
-    resolve_Rf_ = new ReSolve::LinSolverDirectCuSolverRf;
-    GS_ = new ReSolve::GramSchmidt(vector_handler_, ReSolve::GramSchmidt::cgs2);
-    resolve_FGMRES_ = new ReSolve::LinSolverIterativeFGMRES(matrix_handler_, vector_handler_, GS_);
-  }
-#endif
-
-#if RESOLVE_WITH_HIP
-  if (method_ == resolve_rf)
-  {
-    workspace_HIP_ = new ReSolve::LinAlgWorkspaceHIP();
-    workspace_HIP_->initializeHandles();
-
-    matrix_handler_ = new ReSolve::MatrixHandler(workspace_HIP_);
-    vector_handler_ = new ReSolve::VectorHandler(workspace_HIP_);
-
-    resolve_KLU_ = new ReSolve::LinSolverDirectKLU();
-    resolve_Rf_ = new ReSolve::LinSolverDirectRocSolverRf(workspace_HIP_);
-  }
-  else if (method_ == resolve_rf_fgmres)
-  {
-    workspace_HIP_ = new ReSolve::LinAlgWorkspaceHIP();
-    workspace_HIP_->initializeHandles();
-
-    matrix_handler_ = new ReSolve::MatrixHandler(workspace_HIP_);
-    vector_handler_ = new ReSolve::VectorHandler(workspace_HIP_);
-
-    resolve_KLU_ = new ReSolve::LinSolverDirectKLU();
-    resolve_Rf_ = new ReSolve::LinSolverDirectRocSolverRf(workspace_HIP_);
-
-    GS_ = new ReSolve::GramSchmidt(vector_handler_, ReSolve::GramSchmidt::cgs2);
-    resolve_FGMRES_ = new ReSolve::LinSolverIterativeFGMRES(matrix_handler_, vector_handler_, GS_);
-  }
-#endif
-
-  if (method_ == resolve_klu)
-  {
-    workspace_CPU_ = new ReSolve::LinAlgWorkspaceCpu();
-    matrix_handler_ = new ReSolve::MatrixHandler(workspace_CPU_);
-    vector_handler_ = new ReSolve::VectorHandler(workspace_CPU_);
-
-    resolve_KLU_ = new ReSolve::LinSolverDirectKLU;
-  }
-
   return true;
 }
 
@@ -275,34 +212,121 @@ ESymSolverStatus ReSolveSolverInterface::InitializeStructure(Index dim, Index no
   DBG_START_METH("ReSolveSolverInterface::InitializeStructure", dbg_verbosity);
 
   ESymSolverStatus retval = SYMSOLVER_SUCCESS;
-  printf("dim: %d, nonzeros %d\n", dim, nonzeros);
+  printf("ReSolveSolverInterface::InitializeStructure Called: dim: %d, nonzeros %d\n", dim, nonzeros);
+
+  if (!initialized_resolve_)
+  {
+
+#if RESOLVE_WITH_CUDA
+    if (method_ == resolve_glu)
+    {
+      workspace_CUDA_ = new ReSolve::LinAlgWorkspaceCUDA();
+      workspace_CUDA_->initializeHandles();
+
+      matrix_handler_ = new ReSolve::MatrixHandler(workspace_CUDA_);
+      vector_handler_ = new ReSolve::VectorHandler(workspace_CUDA_);
+
+      resolve_KLU_ = new ReSolve::LinSolverDirectKLU();
+      resolve_GLU_ = new ReSolve::LinSolverDirectCuSolverGLU(workspace_CUDA_);
+    }
+    else if (method_ == resolve_rf)
+    {
+      workspace_CUDA_ = new ReSolve::LinAlgWorkspaceCUDA;
+      workspace_CUDA_->initializeHandles();
+
+      matrix_handler_ = new ReSolve::MatrixHandler(workspace_CUDA_);
+      vector_handler_ = new ReSolve::VectorHandler(workspace_CUDA_);
+
+      resolve_KLU_ = new ReSolve::LinSolverDirectKLU;
+      resolve_Rf_ = new ReSolve::LinSolverDirectCuSolverRf();
+    }
+    else if (method_ == resolve_rf_fgmres)
+    {
+      workspace_CUDA_ = new ReSolve::LinAlgWorkspaceCUDA;
+      workspace_CUDA_->initializeHandles();
+
+      matrix_handler_ = new ReSolve::MatrixHandler(workspace_CUDA_);
+      vector_handler_ = new ReSolve::VectorHandler(workspace_CUDA_);
+
+      resolve_KLU_ = new ReSolve::LinSolverDirectKLU;
+      resolve_Rf_ = new ReSolve::LinSolverDirectCuSolverRf;
+      GS_ = new ReSolve::GramSchmidt(vector_handler_, ReSolve::GramSchmidt::cgs2);
+      resolve_FGMRES_ = new ReSolve::LinSolverIterativeFGMRES(matrix_handler_, vector_handler_, GS_);
+    }
+#endif
+
+#if RESOLVE_WITH_HIP
+    if (method_ == resolve_rf)
+    {
+      workspace_HIP_ = new ReSolve::LinAlgWorkspaceHIP();
+      workspace_HIP_->initializeHandles();
+
+      matrix_handler_ = new ReSolve::MatrixHandler(workspace_HIP_);
+      vector_handler_ = new ReSolve::VectorHandler(workspace_HIP_);
+
+      resolve_KLU_ = new ReSolve::LinSolverDirectKLU();
+      resolve_Rf_ = new ReSolve::LinSolverDirectRocSolverRf(workspace_HIP_);
+    }
+    else if (method_ == resolve_rf_fgmres)
+    {
+      workspace_HIP_ = new ReSolve::LinAlgWorkspaceHIP();
+      workspace_HIP_->initializeHandles();
+
+      matrix_handler_ = new ReSolve::MatrixHandler(workspace_HIP_);
+      vector_handler_ = new ReSolve::VectorHandler(workspace_HIP_);
+
+      resolve_KLU_ = new ReSolve::LinSolverDirectKLU();
+      resolve_Rf_ = new ReSolve::LinSolverDirectRocSolverRf(workspace_HIP_);
+
+      GS_ = new ReSolve::GramSchmidt(vector_handler_, ReSolve::GramSchmidt::cgs2);
+      resolve_FGMRES_ = new ReSolve::LinSolverIterativeFGMRES(matrix_handler_, vector_handler_, GS_);
+    }
+#endif
+
+    if (method_ == resolve_klu)
+    {
+      workspace_CPU_ = new ReSolve::LinAlgWorkspaceCpu();
+      matrix_handler_ = new ReSolve::MatrixHandler(workspace_CPU_);
+      vector_handler_ = new ReSolve::VectorHandler(workspace_CPU_);
+
+      resolve_KLU_ = new ReSolve::LinSolverDirectKLU;
+    }
+  }
+
+  initialized_resolve_ = true;
 
   // Store size for later use
   ndim_ = dim;
   nonzeros_ = nonzeros;
   printf("Using Refactorization after %d iterations\n\n", k_);
 
-  A_ = new ReSolve::matrix::Csr(dim, dim, nonzeros);
-  if (val_ != NULL)
+  if (!initialized_)
   {
-    delete[] val_;
+    A_ = new ReSolve::matrix::Csr(dim, dim, nonzeros);
+    if (val_ != NULL)
+    {
+      delete[] val_;
+    }
+    val_ = new Number[nonzeros];
+
+    A_->setMatrixData(const_cast<int*>(ia), const_cast<int*>(ja), val_, ReSolve::memory::HOST);
+    resolve_KLU_->setup(A_);
+
+    vec_rhs_ = new ReSolve::vector::Vector(A_->getNumRows());
+    vec_x_ = new ReSolve::vector::Vector(A_->getNumRows());
+
+    vec_x_->allocate(ReSolve::memory::HOST); // for KLU
+    // vec_x_->allocate(ReSolve::memory::DEVICE);
   }
-  val_ = new Number[nonzeros];
-
-  A_->setMatrixData(const_cast<int*>(ia), const_cast<int*>(ja), val_, ReSolve::memory::HOST);
-  resolve_KLU_->setup(A_);
-
-  vec_rhs_ = new ReSolve::vector::Vector(A_->getNumRows());
-  vec_x_ = new ReSolve::vector::Vector(A_->getNumRows());
-
-  vec_x_->allocate(ReSolve::memory::HOST); // for KLU
-  // vec_x_->allocate(ReSolve::memory::DEVICE);
 
   factorize_ = true;
   n_iteration_ = 0;
 
   initialized_ = true;
   pivtol_changed_ = false;
+
+  printf("After Initialize\n");
+  NVMLHelper::getAvailableGPUMemory();
 
   return retval;
 }
@@ -754,7 +778,7 @@ ESymSolverStatus ReSolveSolverInterface::MultiSolve(bool new_matrix, const Index
 Number* ReSolveSolverInterface::GetValuesArrayPtr()
 {
   DBG_START_METH("ReSolveSolverInterface::GetValuesArrayPtr", dbg_verbosity);
-  DBG_ASSERT(_initialized);
+  DBG_ASSERT(initialized_);
 
   return A_->getValues(ReSolve::memory::HOST);
 }

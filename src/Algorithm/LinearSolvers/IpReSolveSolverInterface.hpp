@@ -128,6 +128,7 @@ private:
   Index nonzeros_;
 
   bool initialized_;
+  bool initialized_resolve_;
   Index ndim_;          ///< Number of dimensions
   Number* val_;         ///< Storage for variables
   Index numneg_;        ///< Number of negative pivots in last factorization
