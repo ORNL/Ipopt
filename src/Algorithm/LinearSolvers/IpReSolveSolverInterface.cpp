@@ -24,30 +24,38 @@ ReSolveSolverInterface::ReSolveSolverInterface() : val_(NULL)
   initialized_resolve_ = false;
   initialized_ = false;
 
-#if RESOLVE_WITH_CUDA
-  printf("Resolve with CUDA\n");
+#if RESOLVE_WITH_GPU
+  printf("Resolve with GPU.\n");
+# if RESOLVE_WITH_CUDA
+  printf("Resolve with CUDA.\n");
   NVMLHelper::getAvailableGPUMemory();
-#elif RESOLVE_WITH_HIP
-  printf("Resolve with HIP\n");
+# else
+  printf("Resolve with HIP.\n");
+# endif
 #else
-  printf("Resolve with CPU. CUDA or HIP Unavailable\n");
+  printf("Resolve with CPU. CUDA or HIP Unavailable.\n");
 #endif
 }
 
 ReSolveSolverInterface::~ReSolveSolverInterface()
 {
 
-  printf("Begin of Destructor\n");
-  NVMLHelper::getAvailableGPUMemory();
+//   printf("Begin of Destructor\n");
+//   NVMLHelper::getAvailableGPUMemory();
 
   DBG_START_METH("ReSolveSolverInterface::~ReSolveSolverInterface()", dbg_verbosity);
   delete[] val_;
 
-#if RESOLVE_WITH_CUDA
-  delete workspace_CUDA_;
   delete matrix_handler_;
   delete vector_handler_;
   delete resolve_KLU_;
+
+#if RESOLVE_WITH_GPU
+  delete GS_;
+  delete resolve_FGMRES_;
+
+# if RESOLVE_WITH_CUDA
+  delete workspace_CUDA_;
   if (method_ == resolve_glu)
   {
     delete resolve_GLU_;
@@ -59,16 +67,10 @@ ReSolveSolverInterface::~ReSolveSolverInterface()
   else if (method_ == resolve_rf_fgmres)
   {
     delete resolve_Rf_;
-    delete GS_;
-    delete resolve_FGMRES_;
   }
-#endif
-
-#if RESOLVE_WITH_HIP
+//   NVMLHelper::getAvailableGPUMemory();
+# else
   delete workspace_HIP_;
-  delete matrix_handler_;
-  delete vector_handler_;
-  delete resolve_KLU_;
   if (method_ == resolve_rf)
   {
     delete resolve_Rf_;
@@ -76,17 +78,15 @@ ReSolveSolverInterface::~ReSolveSolverInterface()
   else if (method_ == resolve_rf_fgmres)
   {
     delete resolve_Rf_;
-    delete GS_;
-    delete resolve_FGMRES_;
   }
+# endif
 #endif
 
   delete vec_rhs_;
   delete vec_x_;
   delete A_;
 
-  printf("End of Destructor\n");
-  NVMLHelper::getAvailableGPUMemory();
+//   printf("End of Destructor\n");
 }
 
 void ReSolveSolverInterface::RegisterOptions(SmartPtr<RegisteredOptions> roptions)
@@ -96,18 +96,12 @@ void ReSolveSolverInterface::RegisterOptions(SmartPtr<RegisteredOptions> roption
 
   options.push_back(resolve_klu);
   descrs.push_back("Use KLU");
-#if RESOLVE_WITH_CUDA
+
+#if RESOLVE_WITH_GPU
+# if RESOLVE_WITH_CUDA
   options.push_back(resolve_glu);
   descrs.push_back("Use GLU");
-
-  options.push_back(resolve_rf);
-  descrs.push_back("Use RF");
-
-  options.push_back(resolve_rf_fgmres);
-  descrs.push_back("Use FGMRES");
-#endif
-
-#if RESOLVE_WITH_HIP
+# endif
   options.push_back(resolve_rf);
   descrs.push_back("Use RF");
 
@@ -216,81 +210,55 @@ ESymSolverStatus ReSolveSolverInterface::InitializeStructure(Index dim, Index no
 
   if (!initialized_resolve_)
   {
-
-#if RESOLVE_WITH_CUDA
-    if (method_ == resolve_glu)
-    {
-      workspace_CUDA_ = new ReSolve::LinAlgWorkspaceCUDA();
-      workspace_CUDA_->initializeHandles();
-
-      matrix_handler_ = new ReSolve::MatrixHandler(workspace_CUDA_);
-      vector_handler_ = new ReSolve::VectorHandler(workspace_CUDA_);
-
-      resolve_KLU_ = new ReSolve::LinSolverDirectKLU();
-      resolve_GLU_ = new ReSolve::LinSolverDirectCuSolverGLU(workspace_CUDA_);
-    }
-    else if (method_ == resolve_rf)
-    {
-      workspace_CUDA_ = new ReSolve::LinAlgWorkspaceCUDA;
-      workspace_CUDA_->initializeHandles();
-
-      matrix_handler_ = new ReSolve::MatrixHandler(workspace_CUDA_);
-      vector_handler_ = new ReSolve::VectorHandler(workspace_CUDA_);
-
-      resolve_KLU_ = new ReSolve::LinSolverDirectKLU;
-      resolve_Rf_ = new ReSolve::LinSolverDirectCuSolverRf();
-    }
-    else if (method_ == resolve_rf_fgmres)
-    {
-      workspace_CUDA_ = new ReSolve::LinAlgWorkspaceCUDA;
-      workspace_CUDA_->initializeHandles();
-
-      matrix_handler_ = new ReSolve::MatrixHandler(workspace_CUDA_);
-      vector_handler_ = new ReSolve::VectorHandler(workspace_CUDA_);
-
-      resolve_KLU_ = new ReSolve::LinSolverDirectKLU;
-      resolve_Rf_ = new ReSolve::LinSolverDirectCuSolverRf;
-      GS_ = new ReSolve::GramSchmidt(vector_handler_, ReSolve::GramSchmidt::cgs2);
-      resolve_FGMRES_ = new ReSolve::LinSolverIterativeFGMRES(matrix_handler_, vector_handler_, GS_);
-    }
-#endif
-
-#if RESOLVE_WITH_HIP
-    if (method_ == resolve_rf)
-    {
-      workspace_HIP_ = new ReSolve::LinAlgWorkspaceHIP();
-      workspace_HIP_->initializeHandles();
-
-      matrix_handler_ = new ReSolve::MatrixHandler(workspace_HIP_);
-      vector_handler_ = new ReSolve::VectorHandler(workspace_HIP_);
-
-      resolve_KLU_ = new ReSolve::LinSolverDirectKLU();
-      resolve_Rf_ = new ReSolve::LinSolverDirectRocSolverRf(workspace_HIP_);
-    }
-    else if (method_ == resolve_rf_fgmres)
-    {
-      workspace_HIP_ = new ReSolve::LinAlgWorkspaceHIP();
-      workspace_HIP_->initializeHandles();
-
-      matrix_handler_ = new ReSolve::MatrixHandler(workspace_HIP_);
-      vector_handler_ = new ReSolve::VectorHandler(workspace_HIP_);
-
-      resolve_KLU_ = new ReSolve::LinSolverDirectKLU();
-      resolve_Rf_ = new ReSolve::LinSolverDirectRocSolverRf(workspace_HIP_);
-
-      GS_ = new ReSolve::GramSchmidt(vector_handler_, ReSolve::GramSchmidt::cgs2);
-      resolve_FGMRES_ = new ReSolve::LinSolverIterativeFGMRES(matrix_handler_, vector_handler_, GS_);
-    }
-#endif
+    resolve_KLU_ = new ReSolve::LinSolverDirectKLU();
 
     if (method_ == resolve_klu)
     {
       workspace_CPU_ = new ReSolve::LinAlgWorkspaceCpu();
       matrix_handler_ = new ReSolve::MatrixHandler(workspace_CPU_);
       vector_handler_ = new ReSolve::VectorHandler(workspace_CPU_);
-
-      resolve_KLU_ = new ReSolve::LinSolverDirectKLU;
     }
+
+#if RESOLVE_WITH_GPU
+# if RESOLVE_WITH_CUDA
+    workspace_CUDA_ = new ReSolve::LinAlgWorkspaceCUDA();
+    workspace_CUDA_->initializeHandles();
+    matrix_handler_ = new ReSolve::MatrixHandler(workspace_CUDA_);
+    vector_handler_ = new ReSolve::VectorHandler(workspace_CUDA_);
+
+    if (method_ == resolve_glu)
+    {
+      resolve_GLU_ = new ReSolve::LinSolverDirectCuSolverGLU(workspace_CUDA_);
+    }
+    else if (method_ == resolve_rf || method_ == resolve_rf_fgmres)
+    {
+      resolve_Rf_ = new ReSolve::LinSolverDirectCuSolverRf();
+    }
+    else if (method_ == resolve_rf_fgmres)
+    {
+      resolve_Rf_ = new ReSolve::LinSolverDirectCuSolverRf;
+      GS_ = new ReSolve::GramSchmidt(vector_handler_, ReSolve::GramSchmidt::cgs2);
+      resolve_FGMRES_ = new ReSolve::LinSolverIterativeFGMRES(matrix_handler_, vector_handler_, GS_);
+    }
+# else
+    workspace_HIP_ = new ReSolve::LinAlgWorkspaceHIP();
+    workspace_HIP_->initializeHandles();
+
+    matrix_handler_ = new ReSolve::MatrixHandler(workspace_HIP_);
+    vector_handler_ = new ReSolve::VectorHandler(workspace_HIP_);
+
+    if (method_ == resolve_rf)
+    {
+      resolve_Rf_ = new ReSolve::LinSolverDirectRocSolverRf(workspace_HIP_);
+    }
+    else if (method_ == resolve_rf_fgmres)
+    {
+      resolve_Rf_ = new ReSolve::LinSolverDirectRocSolverRf(workspace_HIP_);
+      GS_ = new ReSolve::GramSchmidt(vector_handler_, ReSolve::GramSchmidt::cgs2);
+      resolve_FGMRES_ = new ReSolve::LinSolverIterativeFGMRES(matrix_handler_, vector_handler_, GS_);
+    }
+# endif
+#endif
   }
 
   initialized_resolve_ = true;
@@ -325,8 +293,8 @@ ESymSolverStatus ReSolveSolverInterface::InitializeStructure(Index dim, Index no
   initialized_ = true;
   pivtol_changed_ = false;
 
-  printf("After Initialize\n");
-  NVMLHelper::getAvailableGPUMemory();
+//   printf("After Initialize\n");
+//   NVMLHelper::getAvailableGPUMemory();
 
   return retval;
 }
@@ -451,7 +419,7 @@ ESymSolverStatus ReSolveSolverInterface::MultiSolve(bool new_matrix, const Index
       IpData().TimingStats().LinearSystemFactorization().Start();
     }
 
-#if RESOLVE_WITH_CUDA
+# if RESOLVE_WITH_CUDA
     // Actual Refactorize
     if (method_ == resolve_glu)
     {
@@ -461,7 +429,7 @@ ESymSolverStatus ReSolveSolverInterface::MultiSolve(bool new_matrix, const Index
         std::cout << "CUSOLVER GLU refactorization status: " << status << std::endl;
       }
     }
-    else if (method_ == resolve_rf)
+    else if (method_ == resolve_rf || method_ == resolve_rf_fgmres)
     {
       status_refactor = resolve_Rf_->refactorize();
       if (status != 0)
@@ -469,26 +437,8 @@ ESymSolverStatus ReSolveSolverInterface::MultiSolve(bool new_matrix, const Index
         std::cout << "CUSOLVER RF refactorization status: " << status_refactor << std::endl;
       }
     }
-    else if (method_ == resolve_rf_fgmres)
-    {
-      status = resolve_Rf_->refactorize();
-      if (status != 0)
-      {
-        std::cout << "CUSOLVER RF refactorization status: " << status << std::endl;
-      }
-    }
-#endif
-
-#if RESOLVE_WITH_HIP
-    if (method_ == resolve_rf)
-    {
-      int status = resolve_Rf_->refactorize();
-      if (status != 0)
-      {
-        std::cout << "ROCOLVER RF refactorization status: " << status << std::endl;
-      }
-    }
-    else if (method_ == resolve_rf_fgmres)
+# else
+    if (method_ == resolve_rf || method_ == resolve_rf_fgmres)
     {
       int status = resolve_Rf_->refactorize();
       if (status != 0)
@@ -561,8 +511,8 @@ ESymSolverStatus ReSolveSolverInterface::MultiSolve(bool new_matrix, const Index
     // Setup RF here
     if (n_iteration_ == (k_ - 1))
     {
-#if RESOLVE_WITH_CUDA
-      if (method_ == resolve_rf)
+# if RESOLVE_WITH_CUDA
+      if (method_ == resolve_rf || method_ == resolve_rf_fgmres)
       {
         printf("Iteration: %d: Setting up %s\n", n_iteration_, method_.c_str());
         ReSolve::matrix::Csc* L_csc = (ReSolve::matrix::Csc*)resolve_KLU_->getLFactor();
@@ -582,34 +532,15 @@ ESymSolverStatus ReSolveSolverInterface::MultiSolve(bool new_matrix, const Index
         delete L;
         delete U;
       }
-      else if (method_ == resolve_rf_fgmres)
+      
+      if (method_ == resolve_rf_fgmres)
       {
-        printf("Iteration: %d: Setting up %s\n", n_iteration_, method_.c_str());
-
-        ReSolve::matrix::Csc* L_csc = (ReSolve::matrix::Csc*)resolve_KLU_->getLFactor();
-        ReSolve::matrix::Csc* U_csc = (ReSolve::matrix::Csc*)resolve_KLU_->getUFactor();
-        ReSolve::matrix::Csr* L = new ReSolve::matrix::Csr(L_csc->getNumRows(), L_csc->getNumColumns(), L_csc->getNnz());
-        ReSolve::matrix::Csr* U = new ReSolve::matrix::Csr(U_csc->getNumRows(), U_csc->getNumColumns(), U_csc->getNnz());
-        matrix_handler_->csc2csr(L_csc, L, ReSolve::memory::DEVICE);
-        matrix_handler_->csc2csr(U_csc, U, ReSolve::memory::DEVICE);
-        if (L == nullptr)
-        {
-          printf("ERROR");
-        }
-        ReSolve::index_type* P = resolve_KLU_->getPOrdering();
-        ReSolve::index_type* Q = resolve_KLU_->getQOrdering();
-        resolve_Rf_->setup(A_, L, U, P, Q);
         resolve_FGMRES_->setup(A_);
         resolve_FGMRES_->setupPreconditioner("CuSolverRf", resolve_Rf_);
-        // _resolve_FGMRES->resetMatrix(A_);
-
-        delete L;
-        delete U;
       }
-#endif
+# else
 
-#if RESOLVE_WITH_HIP
-      if (method_ == resolve_rf)
+      if (method_ == resolve_rf || method_ == resolve_rf_fgmres)
       {
         ReSolve::matrix::Csc* L = (ReSolve::matrix::Csc*)resolve_KLU_->getLFactor();
         ReSolve::matrix::Csc* U = (ReSolve::matrix::Csc*)resolve_KLU_->getUFactor();
@@ -618,109 +549,88 @@ ESymSolverStatus ReSolveSolverInterface::MultiSolve(bool new_matrix, const Index
         vec_rhs_->update(rhs_vals, ReSolve::memory::HOST, ReSolve::memory::DEVICE);
         resolve_Rf_->setup(A_, L, U, P, Q, vec_rhs_);
       }
-      else if (method_ == resolve_rf_fgmres)
+
+      if (method_ == resolve_rf_fgmres)
       {
-        ReSolve::matrix::Csc* L = (ReSolve::matrix::Csc*)resolve_KLU_->getLFactor();
-        ReSolve::matrix::Csc* U = (ReSolve::matrix::Csc*)resolve_KLU_->getUFactor();
-        ReSolve::index_type* P = resolve_KLU_->getPOrdering();
-        ReSolve::index_type* Q = resolve_KLU_->getQOrdering();
-        vec_rhs_->update(rhs_vals, ReSolve::memory::HOST, ReSolve::memory::DEVICE);
-        resolve_Rf_->setSolveMode(1);
-        resolve_Rf_->setup(A_, L, U, P, Q, vec_rhs_);
         std::cout << "about to set FGMRES" << std::endl;
         GS_->setup(A_->getNumRows(), resolve_FGMRES_->getRestart());
         resolve_FGMRES_->setup(A_);
         resolve_FGMRES_->setupPreconditioner("LU", resolve_Rf_);
       }
-#endif
+# endif
     }
   }
   else // After k iteration only solve
   {
-
     // Every 10 iteration setup again with full factorization? Already factorization done.
+# if RESOLVE_WITH_CUDA
 
-#if RESOLVE_WITH_CUDA
-    if (method_ == resolve_glu)
+    if (method_ == resolve_glu || method_ == resolve_rf || method_ == resolve_rf_fgmres)
     {
       // Copy rhs_vals to vec_rhs cuda
       vec_rhs_->update(rhs_vals, ReSolve::memory::HOST, ReSolve::memory::DEVICE);
-      status = resolve_GLU_->solve(vec_rhs_, vec_x_);
-      if (status != 0)
-      {
-        std::cout << "GLU solve status: " << status << std::endl;
+      
+      if (method_ == resolve_glu)
+      {      
+        status = resolve_GLU_->solve(vec_rhs_, vec_x_);
+        if (status != 0)
+        {
+            std::cout << "GLU solve status: " << status << std::endl;
+        }
       }
-      // Copy vec_x cuda to vec_x in cpu
-      vec_x_->update(vec_x_->getData(ReSolve::memory::DEVICE), ReSolve::memory::DEVICE, ReSolve::memory::HOST);
-    }
-    else if (method_ == resolve_rf)
-    {
-      // Copy rhs_vals to vec_rhs cuda
-      vec_rhs_->update(rhs_vals, ReSolve::memory::HOST, ReSolve::memory::DEVICE);
-      status = resolve_Rf_->solve(vec_rhs_, vec_x_);
-      if (status != 0)
+      else if (method_ == resolve_rf)
       {
-        std::cout << "RF solve status: " << status << std::endl;
+        status = resolve_Rf_->solve(vec_rhs_, vec_x_);
+        if (status != 0)
+        {
+            std::cout << "RF solve status: " << status << std::endl;
+        }
       }
-      // Copy vec_x cuda to vec_x in cpu
-      vec_x_->update(vec_x_->getData(ReSolve::memory::DEVICE), ReSolve::memory::DEVICE, ReSolve::memory::HOST);
+      else if (method_ == resolve_rf_fgmres)
+      {
+        int status = resolve_Rf_->solve(vec_rhs_, vec_x_);
+        if (status != 0)
+        {
+            std::cout << "RF solve status: " << status << std::endl;
+        }
 
-      // Copy original RHS values to _vec_r
-      // vec_r_->update(rhs_vals, ReSolve::memory::HOST, ReSolve::memory::DEVICE);
+        resolve_FGMRES_->resetMatrix(A_);
+        status = resolve_FGMRES_->solve(vec_rhs_, vec_x_);
+        if (status != 0)
+        {
+            std::cout << "RF_FGMRES solve status: " << status << std::endl;
+        }
+      }
+
+      // Copy vec_x cuda to vec_x in cpu
+      vec_x_->update(vec_x_->getData(ReSolve::memory::DEVICE), ReSolve::memory::DEVICE, ReSolve::memory::HOST);
       matrix_handler_->setValuesChanged(true, ReSolve::memory::DEVICE);
     }
-    else if (method_ == resolve_rf_fgmres)
+# else
+    if (method_ == resolve_rf || method_ == resolve_rf_fgmres)
     {
       // Copy rhs_vals to vec_rhs cuda
       vec_rhs_->update(rhs_vals, ReSolve::memory::HOST, ReSolve::memory::DEVICE);
+
       int status = resolve_Rf_->solve(vec_rhs_, vec_x_);
       if (status != 0)
       {
         std::cout << "RF solve status: " << status << std::endl;
       }
 
-      resolve_FGMRES_->resetMatrix(A_);
-      status = resolve_FGMRES_->solve(vec_rhs_, vec_x_);
-      if (status != 0)
+	  if (method_ == resolve_rf_fgmres)
       {
-        std::cout << "RF_FGMRES solve status: " << status << std::endl;
-      }
-      // Copy vec_x cuda to vec_x in cpu
-      vec_x_->update(vec_x_->getData(ReSolve::memory::DEVICE), ReSolve::memory::DEVICE, ReSolve::memory::HOST);
-    }
-#endif
 
-#if RESOLVE_WITH_HIP
-    if (method_ == resolve_rf)
-    {
-      // Copy rhs_vals to vec_rhs cuda
-      vec_rhs_->update(rhs_vals, ReSolve::memory::HOST, ReSolve::memory::DEVICE);
-      int status = resolve_Rf_->solve(vec_rhs_, vec_x_);
-      if (status != 0)
-      {
-        std::cout << "RF solve status: " << status << std::endl;
-      }
-      // Copy vec_x cuda to vec_x in cpu
-      vec_x_->update(vec_x_->getData(ReSolve::memory::DEVICE), ReSolve::memory::DEVICE, ReSolve::memory::HOST);
-    }
-    else if (method_ == resolve_rf_fgmres)
-    {
-      // Copy rhs_vals to vec_rhs cuda
-      vec_rhs_->update(rhs_vals, ReSolve::memory::HOST, ReSolve::memory::DEVICE);
-      int status = resolve_Rf_->solve(vec_rhs_, vec_x_);
-      if (status != 0)
-      {
-        std::cout << "RF solve status: " << status << std::endl;
+        resolve_FGMRES_->resetMatrix(A_);
+        vec_rhs_->update(rhs_vals, ReSolve::memory::HOST, ReSolve::memory::DEVICE);
+        status = resolve_FGMRES_->solve(vec_rhs_, vec_x_);
+        if (status != 0)
+        {
+          std::cout << "RF_FGMRES solve status: " << status << std::endl;
+        }
       }
 
-      resolve_FGMRES_->resetMatrix(A_);
-      vec_rhs_->update(rhs_vals, ReSolve::memory::HOST, ReSolve::memory::DEVICE);
-      status = resolve_FGMRES_->solve(vec_rhs_, vec_x_);
-      if (status != 0)
-      {
-        std::cout << "RF_FGMRES solve status: " << status << std::endl;
-      }
-      // Copy vec_x cuda to vec_x in cpu
+	  // Copy vec_x cuda to vec_x in cpu
       vec_x_->update(vec_x_->getData(ReSolve::memory::DEVICE), ReSolve::memory::DEVICE, ReSolve::memory::HOST);
     }
 #endif

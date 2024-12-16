@@ -151,17 +151,15 @@ private:
   ReSolve::vector::Vector* vec_rhs_;
   ReSolve::vector::Vector* vec_x_;
 
-#if RESOLVE_WITH_CUDA
+#if RESOLVE_WITH_GPU
+# if RESOLVE_WITH_CUDA
   ReSolve::LinAlgWorkspaceCUDA* workspace_CUDA_;
   ReSolve::LinSolverDirectCuSolverGLU* resolve_GLU_;
   ReSolve::LinSolverDirectCuSolverRf* resolve_Rf_;
-  ReSolve::GramSchmidt* GS_;
-  ReSolve::LinSolverIterativeFGMRES* resolve_FGMRES_;
-#endif
-
-#if RESOLVE_WITH_HIP
+# else
   ReSolve::LinAlgWorkspaceHIP* workspace_HIP_;
   ReSolve::LinSolverDirectRocSolverRf* resolve_Rf_;
+# endif
   ReSolve::GramSchmidt* GS_;
   ReSolve::LinSolverIterativeFGMRES* resolve_FGMRES_;
 #endif

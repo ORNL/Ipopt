@@ -25964,10 +25964,13 @@ printf "%s\n" "$as_me: resolve_pcfiles is \"$resolve_pcfiles\"" >&6;}
   if test $coin_has_resolve = yes ; then
     printf "%s\n" "#define IPOPT_HAS_RESOLVE 1" >>confdefs.h
 
-    if test $with_cuda = yes ; then
+    if test $with_cuda = yes -a $with_hip = yes; then
+      echo "ERROR. Both should not be YES!"
+    elif test $with_cuda = yes ; then
+      printf "%s\n" "#define RESOLVE_WITH_GPU 1" >>confdefs.h
       printf "%s\n" "#define RESOLVE_WITH_CUDA 1" >>confdefs.h
-    fi
-    if test $with_hip = yes ; then
+    elif test $with_hip = yes ; then
+      printf "%s\n" "#define RESOLVE_WITH_GPU 1" >>confdefs.h
       printf "%s\n" "#define RESOLVE_WITH_HIP 1" >>confdefs.h
     fi
 
