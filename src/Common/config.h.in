@@ -117,6 +117,7 @@
 #undef IPOPT_HAS_RESOLVE
 
 /* Define to 1 if the ReSolve package is available */
+#undef RESOLVE_WITH_GPU
 #undef RESOLVE_WITH_CUDA
 #undef RESOLVE_WITH_HIP
 
