@@ -53,33 +53,18 @@ ReSolveSolverInterface::~ReSolveSolverInterface()
 #if RESOLVE_WITH_GPU
   delete GS_;
   delete resolve_FGMRES_;
+  delete workspace_GPU_;
 
-# if RESOLVE_WITH_CUDA
-  delete workspace_CUDA_;
   if (method_ == resolve_glu)
   {
+# if RESOLVE_WITH_CUDA
     delete resolve_GLU_;
-  }
-  else if (method_ == resolve_rf)
-  {
-    delete resolve_Rf_;
-  }
-  else if (method_ == resolve_rf_fgmres)
-  {
-    delete resolve_Rf_;
-  }
-//   NVMLHelper::getAvailableGPUMemory();
-# else
-  delete workspace_HIP_;
-  if (method_ == resolve_rf)
-  {
-    delete resolve_Rf_;
-  }
-  else if (method_ == resolve_rf_fgmres)
-  {
-    delete resolve_Rf_;
-  }
 # endif
+  }
+  else if (method_ == resolve_rf || method_ == resolve_rf_fgmres)
+  {
+    delete resolve_Rf_;
+  }
 #endif
 
   delete vec_rhs_;
@@ -220,44 +205,28 @@ ESymSolverStatus ReSolveSolverInterface::InitializeStructure(Index dim, Index no
     }
 
 #if RESOLVE_WITH_GPU
-# if RESOLVE_WITH_CUDA
-    workspace_CUDA_ = new ReSolve::LinAlgWorkspaceCUDA();
-    workspace_CUDA_->initializeHandles();
-    matrix_handler_ = new ReSolve::MatrixHandler(workspace_CUDA_);
-    vector_handler_ = new ReSolve::VectorHandler(workspace_CUDA_);
+    workspace_GPU_ = new workspace_type();
+    workspace_GPU_->initializeHandles();
+
+    matrix_handler_ = new ReSolve::MatrixHandler(workspace_GPU_);
+    vector_handler_ = new ReSolve::VectorHandler(workspace_GPU_);
 
     if (method_ == resolve_glu)
     {
-      resolve_GLU_ = new ReSolve::LinSolverDirectCuSolverGLU(workspace_CUDA_);
+# if RESOLVE_WITH_CUDA
+      resolve_GLU_ = new ReSolve::LinSolverDirectCuSolverGLU(workspace_GPU_);
+# endif
     }
     else if (method_ == resolve_rf || method_ == resolve_rf_fgmres)
     {
-      resolve_Rf_ = new ReSolve::LinSolverDirectCuSolverRf();
+      resolve_Rf_ = new rf_solver(workspace_GPU_);
     }
-    else if (method_ == resolve_rf_fgmres)
+    
+    if (method_ == resolve_rf_fgmres)
     {
-      resolve_Rf_ = new ReSolve::LinSolverDirectCuSolverRf;
       GS_ = new ReSolve::GramSchmidt(vector_handler_, ReSolve::GramSchmidt::cgs2);
       resolve_FGMRES_ = new ReSolve::LinSolverIterativeFGMRES(matrix_handler_, vector_handler_, GS_);
     }
-# else
-    workspace_HIP_ = new ReSolve::LinAlgWorkspaceHIP();
-    workspace_HIP_->initializeHandles();
-
-    matrix_handler_ = new ReSolve::MatrixHandler(workspace_HIP_);
-    vector_handler_ = new ReSolve::VectorHandler(workspace_HIP_);
-
-    if (method_ == resolve_rf)
-    {
-      resolve_Rf_ = new ReSolve::LinSolverDirectRocSolverRf(workspace_HIP_);
-    }
-    else if (method_ == resolve_rf_fgmres)
-    {
-      resolve_Rf_ = new ReSolve::LinSolverDirectRocSolverRf(workspace_HIP_);
-      GS_ = new ReSolve::GramSchmidt(vector_handler_, ReSolve::GramSchmidt::cgs2);
-      resolve_FGMRES_ = new ReSolve::LinSolverIterativeFGMRES(matrix_handler_, vector_handler_, GS_);
-    }
-# endif
 #endif
   }
 
