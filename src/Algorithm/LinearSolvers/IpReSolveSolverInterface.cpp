@@ -51,19 +51,23 @@ ReSolveSolverInterface::~ReSolveSolverInterface()
   delete resolve_KLU_;
 
 #if RESOLVE_WITH_GPU
-  delete GS_;
-  delete resolve_FGMRES_;
   delete workspace_GPU_;
 
-  if (method_ == resolve_glu)
-  {
-# if RESOLVE_WITH_CUDA
-    delete resolve_GLU_;
-# endif
-  }
-  else if (method_ == resolve_rf || method_ == resolve_rf_fgmres)
+  if (method_ == resolve_rf || method_ == resolve_rf_fgmres)
   {
     delete resolve_Rf_;
+  }
+# if RESOLVE_WITH_CUDA
+  else if (method_ == resolve_glu)
+  {
+    delete resolve_GLU_;
+  }
+# endif
+
+  if (method_ == resolve_rf_fgmres)
+  {
+    delete GS_;
+    delete resolve_FGMRES_;
   }
 #endif
 
@@ -211,16 +215,17 @@ ESymSolverStatus ReSolveSolverInterface::InitializeStructure(Index dim, Index no
     matrix_handler_ = new ReSolve::MatrixHandler(workspace_GPU_);
     vector_handler_ = new ReSolve::VectorHandler(workspace_GPU_);
 
-    if (method_ == resolve_glu)
-    {
-# if RESOLVE_WITH_CUDA
-      resolve_GLU_ = new ReSolve::LinSolverDirectCuSolverGLU(workspace_GPU_);
-# endif
-    }
-    else if (method_ == resolve_rf || method_ == resolve_rf_fgmres)
+
+    if (method_ == resolve_rf || method_ == resolve_rf_fgmres)
     {
       resolve_Rf_ = new rf_solver(workspace_GPU_);
     }
+# if RESOLVE_WITH_CUDA
+    else if (method_ == resolve_glu)
+    {
+      resolve_GLU_ = new ReSolve::LinSolverDirectCuSolverGLU(workspace_GPU_);
+    }
+# endif
     
     if (method_ == resolve_rf_fgmres)
     {
