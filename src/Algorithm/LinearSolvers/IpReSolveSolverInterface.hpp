@@ -13,7 +13,9 @@
 
 #include "IpoptConfig.h"
 
+#if RESOLVE_WITH_CUDA
 #include "NVMLHelper.hpp"
+#endif
 
 #include <resolve/matrix/Coo.hpp>
 #include <resolve/matrix/Csc.hpp>
@@ -29,16 +31,16 @@
 #if RESOLVE_WITH_GPU
 #include <resolve/LinSolverIterativeFGMRES.hpp>
 
-# if RESOLVE_WITH_CUDA
+#if RESOLVE_WITH_CUDA
 #include <resolve/LinSolverDirectCuSolverGLU.hpp>
 #include <resolve/LinSolverDirectCuSolverRf.hpp>
 using workspace_type = ReSolve::LinAlgWorkspaceCUDA;
 using rf_solver = ReSolve::LinSolverDirectCuSolverRf;
 
-# else
+#else
 #include <resolve/LinSolverDirectRocSolverRf.hpp>
 using workspace_type = ReSolve::LinAlgWorkspaceHIP;
-using rf_solver = LinSolverDirectRocSolverRf;
+using rf_solver = ReSolve::LinSolverDirectRocSolverRf;
 # endif
 #endif
 
@@ -58,7 +60,7 @@ namespace Ipopt
 static const std::string resolve_klu = "klu";
 
 #if RESOLVE_WITH_GPU
-# if RESOLVE_WITH_CUDA
+#if RESOLVE_WITH_CUDA
 static const std::string resolve_glu = "glu";
 # endif
 static const std::string resolve_rf = "rf";
