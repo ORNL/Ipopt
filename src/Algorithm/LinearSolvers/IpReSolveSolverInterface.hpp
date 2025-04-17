@@ -13,7 +13,9 @@
 
 #include "IpoptConfig.h"
 
+#if RESOLVE_WITH_CUDA
 #include "NVMLHelper.hpp"
+#endif
 
 #include <resolve/matrix/Coo.hpp>
 #include <resolve/matrix/Csc.hpp>
@@ -24,19 +26,24 @@
 #include <resolve/vector/VectorHandler.hpp>
 
 #include <resolve/LinSolverDirectKLU.hpp>
+#include <resolve/workspace/LinAlgWorkspace.hpp>
+
+#if RESOLVE_WITH_GPU
+#include <resolve/LinSolverIterativeFGMRES.hpp>
 
 #if RESOLVE_WITH_CUDA
 #include <resolve/LinSolverDirectCuSolverGLU.hpp>
 #include <resolve/LinSolverDirectCuSolverRf.hpp>
-#include <resolve/LinSolverIterativeFGMRES.hpp>
-#endif
+using workspace_type = ReSolve::LinAlgWorkspaceCUDA;
+using rf_solver = ReSolve::LinSolverDirectCuSolverRf;
 
-#if RESOLVE_WITH_HIP
+#else
 #include <resolve/LinSolverDirectRocSolverRf.hpp>
-#include <resolve/LinSolverIterativeFGMRES.hpp>
+using workspace_type = ReSolve::LinAlgWorkspaceHIP;
+using rf_solver = ReSolve::LinSolverDirectRocSolverRf;
+# endif
 #endif
 
-#include <resolve/workspace/LinAlgWorkspace.hpp>
 
 #include <sstream>
 #include <string>
@@ -46,17 +53,16 @@
 #include "IpTypes.h"
 using namespace ReSolve::constants;
 
+
 namespace Ipopt
 {
 
 static const std::string resolve_klu = "klu";
+
+#if RESOLVE_WITH_GPU
 #if RESOLVE_WITH_CUDA
 static const std::string resolve_glu = "glu";
-static const std::string resolve_rf = "rf";
-static const std::string resolve_rf_fgmres = "rf_fgmres";
-#endif
-
-#if RESOLVE_WITH_HIP
+# endif
 static const std::string resolve_rf = "rf";
 static const std::string resolve_rf_fgmres = "rf_fgmres";
 #endif
@@ -151,14 +157,12 @@ private:
   ReSolve::vector::Vector* vec_rhs_;
   ReSolve::vector::Vector* vec_x_;
 
+
 #if RESOLVE_WITH_GPU
+  workspace_type* workspace_GPU_;
+  rf_solver* resolve_Rf_;
 # if RESOLVE_WITH_CUDA
-  ReSolve::LinAlgWorkspaceCUDA* workspace_CUDA_;
   ReSolve::LinSolverDirectCuSolverGLU* resolve_GLU_;
-  ReSolve::LinSolverDirectCuSolverRf* resolve_Rf_;
-# else
-  ReSolve::LinAlgWorkspaceHIP* workspace_HIP_;
-  ReSolve::LinSolverDirectRocSolverRf* resolve_Rf_;
 # endif
   ReSolve::GramSchmidt* GS_;
   ReSolve::LinSolverIterativeFGMRES* resolve_FGMRES_;
