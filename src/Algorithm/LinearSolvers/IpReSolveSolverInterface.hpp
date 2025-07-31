@@ -13,10 +13,6 @@
 
 #include "IpoptConfig.h"
 
-#if RESOLVE_WITH_CUDA
-#include "NVMLHelper.hpp"
-#endif
-
 #include <resolve/matrix/Coo.hpp>
 #include <resolve/matrix/Csc.hpp>
 #include <resolve/matrix/Csr.hpp>
