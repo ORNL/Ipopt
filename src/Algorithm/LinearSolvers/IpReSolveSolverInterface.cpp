@@ -214,7 +214,7 @@ ESymSolverStatus ReSolveSolverInterface::InitializeStructure(Index dim, Index no
     if (method_ == resolve_rf || method_ == resolve_rf_fgmres)
     {
       printf("Resolve::RF Setup\n");
-      resolve_Rf_ = new rf_solver();
+      resolve_Rf_ = new rf_solver(workspace_GPU_);
     }
 # if RESOLVE_WITH_CUDA
     else if (method_ == resolve_glu)
@@ -281,9 +281,15 @@ ESymSolverStatus ReSolveSolverInterface::MultiSolve(bool new_matrix, const Index
   A_->setDataPointers(const_cast<int*>(ia), const_cast<int*>(ja),  const_cast<Number*>(A_->getValues(ReSolve::memory::HOST)), ReSolve::memory::HOST);
 
 #if RESOLVE_WITH_GPU
+#if RESOLVE_WITH_CUDA
   if (method_ == resolve_rf || method_ == resolve_rf_fgmres || method_ == resolve_glu) {
     A_->syncData(ReSolve::memory::DEVICE);
   }
+#else
+  if (method_ == resolve_rf || method_ == resolve_rf_fgmres) {
+    A_->syncData(ReSolve::memory::DEVICE);
+  }
+#endif
 #endif
 
   // FACTORIZE
