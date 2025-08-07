@@ -28,7 +28,6 @@ ReSolveSolverInterface::ReSolveSolverInterface() : val_(NULL)
   printf("Resolve with GPU.\n");
 # if RESOLVE_WITH_CUDA
   printf("Resolve with CUDA.\n");
-  NVMLHelper::getAvailableGPUMemory();
 # else
   printf("Resolve with HIP.\n");
 # endif
@@ -39,10 +38,6 @@ ReSolveSolverInterface::ReSolveSolverInterface() : val_(NULL)
 
 ReSolveSolverInterface::~ReSolveSolverInterface()
 {
-
-//   printf("Begin of Destructor\n");
-//   NVMLHelper::getAvailableGPUMemory();
-
   DBG_START_METH("ReSolveSolverInterface::~ReSolveSolverInterface()", dbg_verbosity);
   delete[] val_;
 
@@ -74,8 +69,6 @@ ReSolveSolverInterface::~ReSolveSolverInterface()
   delete vec_rhs_;
   delete vec_x_;
   delete A_;
-
-//   printf("End of Destructor\n");
 }
 
 void ReSolveSolverInterface::RegisterOptions(SmartPtr<RegisteredOptions> roptions)
@@ -203,12 +196,14 @@ ESymSolverStatus ReSolveSolverInterface::InitializeStructure(Index dim, Index no
 
     if (method_ == resolve_klu)
     {
+      printf("Resolve::KLU Setup\n");
       workspace_CPU_ = new ReSolve::LinAlgWorkspaceCpu();
       matrix_handler_ = new ReSolve::MatrixHandler(workspace_CPU_);
       vector_handler_ = new ReSolve::VectorHandler(workspace_CPU_);
     }
 
 #if RESOLVE_WITH_GPU
+    printf("Resolve::GPU Setup\n");
     workspace_GPU_ = new workspace_type();
     workspace_GPU_->initializeHandles();
 
@@ -218,17 +213,20 @@ ESymSolverStatus ReSolveSolverInterface::InitializeStructure(Index dim, Index no
 
     if (method_ == resolve_rf || method_ == resolve_rf_fgmres)
     {
+      printf("Resolve::RF Setup\n");
       resolve_Rf_ = new rf_solver(workspace_GPU_);
     }
 # if RESOLVE_WITH_CUDA
     else if (method_ == resolve_glu)
     {
+      printf("Resolve::GLU Setup\n");
       resolve_GLU_ = new ReSolve::LinSolverDirectCuSolverGLU(workspace_GPU_);
     }
 # endif
     
     if (method_ == resolve_rf_fgmres)
     {
+      printf("Resolve::FGMRES Setup\n");
       GS_ = new ReSolve::GramSchmidt(vector_handler_, ReSolve::GramSchmidt::CGS2);
       resolve_FGMRES_ = new ReSolve::LinSolverIterativeFGMRES(matrix_handler_, vector_handler_, GS_);
     }
@@ -258,7 +256,6 @@ ESymSolverStatus ReSolveSolverInterface::InitializeStructure(Index dim, Index no
     vec_x_ = new ReSolve::vector::Vector(A_->getNumRows());
 
     vec_x_->allocate(ReSolve::memory::HOST); // for KLU
-    // vec_x_->allocate(ReSolve::memory::DEVICE);
   }
 
   factorize_ = true;
@@ -266,9 +263,6 @@ ESymSolverStatus ReSolveSolverInterface::InitializeStructure(Index dim, Index no
 
   initialized_ = true;
   pivtol_changed_ = false;
-
-//   printf("After Initialize\n");
-//   NVMLHelper::getAvailableGPUMemory();
 
   return retval;
 }
@@ -283,7 +277,20 @@ ESymSolverStatus ReSolveSolverInterface::MultiSolve(bool new_matrix, const Index
   bool full_factor_done = false;
 
   // Get Data from CPU and update the A Matrix
-  A_->copyDataFrom(A_->getRowData(ReSolve::memory::HOST), A_->getColData(ReSolve::memory::HOST), A_->getValues(ReSolve::memory::HOST), ReSolve::memory::HOST, ReSolve::memory::DEVICE);
+
+  A_->setDataPointers(const_cast<int*>(ia), const_cast<int*>(ja),  const_cast<Number*>(A_->getValues(ReSolve::memory::HOST)), ReSolve::memory::HOST);
+
+#if RESOLVE_WITH_GPU
+#if RESOLVE_WITH_CUDA
+  if (method_ == resolve_rf || method_ == resolve_rf_fgmres || method_ == resolve_glu) {
+    A_->syncData(ReSolve::memory::DEVICE);
+  }
+#else
+  if (method_ == resolve_rf || method_ == resolve_rf_fgmres) {
+    A_->syncData(ReSolve::memory::DEVICE);
+  }
+#endif
+#endif
 
   // FACTORIZE
 
@@ -294,10 +301,8 @@ ESymSolverStatus ReSolveSolverInterface::MultiSolve(bool new_matrix, const Index
     // re_factorize_ = true;
   }
 
-  if (factorize_ && (new_matrix || re_factorize_))
-  {
-    // printf("Iteration: %d: Performing KLU Factorization\n", n_iteration_);
-
+  if( n_iteration_ == 0){
+    printf("First Iteration: %d: Performing KLU Factorization\n", n_iteration_);
     // Symbolic Factorization
     if (HaveIpData())
     {
@@ -314,6 +319,11 @@ ESymSolverStatus ReSolveSolverInterface::MultiSolve(bool new_matrix, const Index
     {
       IpData().TimingStats().LinearSystemSymbolicFactorization().End();
     }
+  }
+
+  if (factorize_ && (new_matrix || re_factorize_))
+  {
+    // printf("Iteration: %d: Performing KLU Factorization\n", n_iteration_);
 
     //  perform the factorization
     if (HaveIpData())
@@ -322,7 +332,7 @@ ESymSolverStatus ReSolveSolverInterface::MultiSolve(bool new_matrix, const Index
     }
 
     // First Factorization is always done by KLU
-    std::cout << "%" << n_iteration_ << "%" << "FULL FACTORIZATIOM" << std::endl;
+    // std::cout << "%" << n_iteration_ << "%" << "KLU FULL FACTORIZATION" << std::endl;
     status = resolve_KLU_->factorize();
     full_factor_done = true;
 
@@ -397,6 +407,7 @@ ESymSolverStatus ReSolveSolverInterface::MultiSolve(bool new_matrix, const Index
     // Actual Refactorize
     if (method_ == resolve_glu)
     {
+      //std::cout << "%" << n_iteration_ << "%" << "GLU->refactorize()" << std::endl;
       status = resolve_GLU_->refactorize();
       if (status != 0)
       {
@@ -405,6 +416,7 @@ ESymSolverStatus ReSolveSolverInterface::MultiSolve(bool new_matrix, const Index
     }
     else if (method_ == resolve_rf || method_ == resolve_rf_fgmres)
     {
+      //std::cout << "%" << n_iteration_ << "%" << "RF->refactorize()" << std::endl; 
       status_refactor = resolve_Rf_->refactorize();
       if (status != 0)
       {
@@ -414,6 +426,7 @@ ESymSolverStatus ReSolveSolverInterface::MultiSolve(bool new_matrix, const Index
 # else
     if (method_ == resolve_rf || method_ == resolve_rf_fgmres)
     {
+      //std::cout << "%" << n_iteration_ << "%" << "RF->refactorize()" << std::endl;
       int status = resolve_Rf_->refactorize();
       if (status != 0)
       {
@@ -424,7 +437,7 @@ ESymSolverStatus ReSolveSolverInterface::MultiSolve(bool new_matrix, const Index
 
     if (method_ == resolve_klu)
     {
-      std::cout << "%" << n_iteration_ << "%" << "RE-FACTORIZATIOM" << std::endl;
+      //std::cout << "%" << n_iteration_ << "%" << "KLU->refactorize()" << std::endl;
       status = resolve_KLU_->refactorize();
       if (status != 0)
       {
@@ -452,7 +465,7 @@ ESymSolverStatus ReSolveSolverInterface::MultiSolve(bool new_matrix, const Index
       if (use_rcond_)
       {
         Number rcond_val = resolve_KLU_->getMatrixConditionNumber();
-        printf("RCond: %12.8e\n", rcond_val);
+        //printf("RCond: %12.8e\n", rcond_val);
         if (rcond_val < rcond_val_)
         {
           if (full_factor_done)
@@ -476,6 +489,7 @@ ESymSolverStatus ReSolveSolverInterface::MultiSolve(bool new_matrix, const Index
       // Copy rhs_vals to vec_rhs
       vec_rhs_->copyDataFrom(rhs_vals, ReSolve::memory::HOST, ReSolve::memory::HOST);
       status = resolve_KLU_->solve(vec_rhs_, vec_x_);
+      //printf("Solving using KLU!\n");
       if (status != 0)
       {
         std::cout << "KLU solve status: " << status << std::endl;
@@ -488,11 +502,14 @@ ESymSolverStatus ReSolveSolverInterface::MultiSolve(bool new_matrix, const Index
 # if RESOLVE_WITH_CUDA
       if (method_ == resolve_rf || method_ == resolve_rf_fgmres)
       {
-        printf("Iteration: %d: Setting up %s\n", n_iteration_, method_.c_str());
+        printf("CUDA: Iteration: %d: Setting up %s\n", n_iteration_, method_.c_str());
+
         ReSolve::matrix::Csc* L_csc = (ReSolve::matrix::Csc*)resolve_KLU_->getLFactor();
         ReSolve::matrix::Csc* U_csc = (ReSolve::matrix::Csc*)resolve_KLU_->getUFactor();
         ReSolve::matrix::Csr* L = new ReSolve::matrix::Csr(L_csc->getNumRows(), L_csc->getNumColumns(), L_csc->getNnz());
         ReSolve::matrix::Csr* U = new ReSolve::matrix::Csr(U_csc->getNumRows(), U_csc->getNumColumns(), U_csc->getNnz());
+        L_csc->syncData(ReSolve::memory::DEVICE);
+        U_csc->syncData(ReSolve::memory::DEVICE);
         matrix_handler_->csc2csr(L_csc, L, ReSolve::memory::DEVICE);
         matrix_handler_->csc2csr(U_csc, U, ReSolve::memory::DEVICE);
         if (L == nullptr)
@@ -516,6 +533,7 @@ ESymSolverStatus ReSolveSolverInterface::MultiSolve(bool new_matrix, const Index
 
       if (method_ == resolve_rf || method_ == resolve_rf_fgmres)
       {
+        printf("HIP: Iteration: %d: Setting up %s\n", n_iteration_, method_.c_str());
         ReSolve::matrix::Csc* L = (ReSolve::matrix::Csc*)resolve_KLU_->getLFactor();
         ReSolve::matrix::Csc* U = (ReSolve::matrix::Csc*)resolve_KLU_->getUFactor();
         ReSolve::index_type* P = resolve_KLU_->getPOrdering();
@@ -615,7 +633,7 @@ ESymSolverStatus ReSolveSolverInterface::MultiSolve(bool new_matrix, const Index
       if (use_rcond_)
       {
         Number rcond_val = resolve_KLU_->getMatrixConditionNumber();
-        printf("RCond: %12.8e\n", rcond_val);
+        //printf("RCond: %12.8e\n", rcond_val);
         if (rcond_val < rcond_val_)
         {
           if (full_factor_done)
