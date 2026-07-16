@@ -9,6 +9,7 @@
 
 #include <cmath>
 #include <iostream>
+#include <type_traits>
 
 namespace Ipopt
 {
@@ -16,14 +17,52 @@ namespace Ipopt
 static const Index dbg_verbosity = 0;
 #endif
 
-ReSolveSolverInterface::ReSolveSolverInterface() : val_(NULL)
+static_assert(
+   std::is_same<Number, ReSolve::real_type>::value,
+   "Ipopt and ReSolve must use the same floating-point type.");
+
+static_assert(
+   std::is_same<Index, ReSolve::index_type>::value,
+   "Ipopt and ReSolve must use the same index type.");
+
+ReSolveSolverInterface::ReSolveSolverInterface()
+  : nonzeros_(0),
+    initialized_(false),
+    initialized_resolve_(false),
+    ndim_(0),
+    val_(NULL),
+    numneg_(0),
+    pivtol_changed_(false),
+    re_factorize_(false),
+    factorize_(false),
+    method_(resolve_klu),
+    n_iteration_(0),
+    k_(1),
+    pivot_tol_(0.1),
+    ordering_(1),
+    halt_if_singular_(false),
+    rcond_val_(1e-128),
+    use_rcond_(false),
+    factor_by_t_(2),
+    resolve_KLU_(NULL),
+    workspace_CPU_(NULL),
+    A_(NULL),
+    vec_rhs_(NULL),
+    vec_x_(NULL),
+#if RESOLVE_WITH_GPU
+    workspace_GPU_(NULL),
+    resolve_Rf_(NULL),
+# if RESOLVE_WITH_CUDA
+    resolve_GLU_(NULL),
+# endif
+    GS_(NULL),
+    resolve_preconditioner_(NULL),
+    resolve_FGMRES_(NULL),
+#endif
+    matrix_handler_(NULL),
+    vector_handler_(NULL)
 {
   DBG_START_METH("ReSolveSolverInterface::ReSolveSolverInterface()", dbg_verbosity);
-  rcond_val_ = 1e-128;
-  factor_by_t_ = 2;
-  initialized_resolve_ = false;
-  initialized_ = false;
-
 #if RESOLVE_WITH_GPU
   printf("Resolve with GPU.\n");
 # if RESOLVE_WITH_CUDA
@@ -39,36 +78,31 @@ ReSolveSolverInterface::ReSolveSolverInterface() : val_(NULL)
 ReSolveSolverInterface::~ReSolveSolverInterface()
 {
   DBG_START_METH("ReSolveSolverInterface::~ReSolveSolverInterface()", dbg_verbosity);
-  delete[] val_;
+#if RESOLVE_WITH_GPU
+  delete resolve_FGMRES_;
+  delete resolve_preconditioner_;
+  delete GS_;
+
+# if RESOLVE_WITH_CUDA
+  delete resolve_GLU_;
+# endif
+  delete resolve_Rf_;
+#endif
+
+  delete resolve_KLU_;
 
   delete matrix_handler_;
   delete vector_handler_;
-  delete resolve_KLU_;
 
 #if RESOLVE_WITH_GPU
   delete workspace_GPU_;
-
-  if (method_ == resolve_rf || method_ == resolve_rf_fgmres)
-  {
-    delete resolve_Rf_;
-  }
-# if RESOLVE_WITH_CUDA
-  else if (method_ == resolve_glu)
-  {
-    delete resolve_GLU_;
-  }
-# endif
-
-  if (method_ == resolve_rf_fgmres)
-  {
-    delete GS_;
-    delete resolve_FGMRES_;
-  }
 #endif
+  delete workspace_CPU_;
 
   delete vec_rhs_;
   delete vec_x_;
   delete A_;
+  delete[] val_;
 }
 
 void ReSolveSolverInterface::RegisterOptions(SmartPtr<RegisteredOptions> roptions)
@@ -153,11 +187,9 @@ bool ReSolveSolverInterface::InitializeImpl(const OptionsList& options, const st
 
   // printf("ReSolveSolverInterface::InitializeImpl is Called\n");
 
-  Number tol;
-  options.GetNumericValue("resolve_tol", tol, prefix);
+  options.GetNumericValue("resolve_tol", pivot_tol_, prefix);
 
-  Index order_method;
-  options.GetIntegerValue("resolve_ordering", order_method, prefix);
+  options.GetIntegerValue("resolve_ordering", ordering_, prefix);
 
   Index btf;
   options.GetIntegerValue("resolve_btf", btf, prefix);
@@ -169,12 +201,9 @@ bool ReSolveSolverInterface::InitializeImpl(const OptionsList& options, const st
   options.GetIntegerValue("resolve_n_skip_refactoring", n_skip_refactoring, prefix);
   k_ = n_skip_refactoring;
 
-  bool halt_if_singular;
-  options.GetBoolValue("resolve_halt_if_singular", halt_if_singular, prefix);
+  options.GetBoolValue("resolve_halt_if_singular", halt_if_singular_, prefix);
 
-  std::string method;
-  options.GetStringValue("resolve_method", method, prefix);
-  method_ = method;
+  options.GetStringValue("resolve_method", method_, prefix);
 
   options.GetNumericValue("resolve_rcond_val", rcond_val_, prefix);
   options.GetBoolValue("resolve_use_rcond", use_rcond_, prefix);
@@ -193,6 +222,9 @@ ESymSolverStatus ReSolveSolverInterface::InitializeStructure(Index dim, Index no
   if (!initialized_resolve_)
   {
     resolve_KLU_ = new ReSolve::LinSolverDirectKLU();
+    resolve_KLU_->setPivotThreshold(pivot_tol_);
+    resolve_KLU_->setOrdering(static_cast<int>(ordering_));
+    resolve_KLU_->setHaltIfSingular(halt_if_singular_);
 
     if (method_ == resolve_klu)
     {
@@ -203,37 +235,61 @@ ESymSolverStatus ReSolveSolverInterface::InitializeStructure(Index dim, Index no
     }
 
 #if RESOLVE_WITH_GPU
-    printf("Resolve::GPU Setup\n");
-    workspace_GPU_ = new workspace_type();
-    workspace_GPU_->initializeHandles();
-
-    matrix_handler_ = new ReSolve::MatrixHandler(workspace_GPU_);
-    vector_handler_ = new ReSolve::VectorHandler(workspace_GPU_);
-
-
-    if (method_ == resolve_rf || method_ == resolve_rf_fgmres)
+    else
     {
-      printf("Resolve::RF Setup\n");
-      resolve_Rf_ = new rf_solver(workspace_GPU_);
-    }
+      printf("Resolve::GPU Setup\n");
+
+      workspace_GPU_ = new workspace_type();
+      workspace_GPU_->initializeHandles();
+
+      matrix_handler_ = new ReSolve::MatrixHandler(workspace_GPU_);
+      vector_handler_ = new ReSolve::VectorHandler(workspace_GPU_);
+
+      if (method_ == resolve_rf || method_ == resolve_rf_fgmres)
+      {
+        printf("Resolve::RF Setup\n");
+        resolve_Rf_ = new rf_solver(workspace_GPU_);
+      }
 # if RESOLVE_WITH_CUDA
-    else if (method_ == resolve_glu)
-    {
-      printf("Resolve::GLU Setup\n");
-      resolve_GLU_ = new ReSolve::LinSolverDirectCuSolverGLU(workspace_GPU_);
-    }
+      else if (method_ == resolve_glu)
+      {
+        printf("Resolve::GLU Setup\n");
+        resolve_GLU_ =
+          new ReSolve::LinSolverDirectCuSolverGLU(workspace_GPU_);
+      }
 # endif
-    
-    if (method_ == resolve_rf_fgmres)
-    {
-      printf("Resolve::FGMRES Setup\n");
-      GS_ = new ReSolve::GramSchmidt(vector_handler_, ReSolve::GramSchmidt::CGS2);
-      resolve_FGMRES_ = new ReSolve::LinSolverIterativeFGMRES(matrix_handler_, vector_handler_, GS_);
+
+      if (method_ == resolve_rf_fgmres)
+      {
+        printf("Resolve::FGMRES Setup\n");
+
+        GS_ = new ReSolve::GramSchmidt(
+          vector_handler_,
+          ReSolve::GramSchmidt::CGS2);
+
+        resolve_FGMRES_ = new ReSolve::LinSolverIterativeFGMRES(
+          matrix_handler_,
+          vector_handler_,
+          GS_);
+
+        resolve_preconditioner_ =
+          new ReSolve::PreconditionerLU(resolve_Rf_);
+
+        if (resolve_FGMRES_->setPreconditioner(
+              resolve_preconditioner_) != 0)
+        {
+          Jnlst().Printf(
+            J_ERROR,
+            J_LINEAR_ALGEBRA,
+            "Failed to attach the ReSolve RF preconditioner "
+            "to FGMRES.\n");
+          return SYMSOLVER_FATAL_ERROR;
+        }
+      }
     }
 #endif
+    initialized_resolve_ = true;
   }
-
-  initialized_resolve_ = true;
 
   // Store size for later use
   ndim_ = dim;
@@ -243,21 +299,66 @@ ESymSolverStatus ReSolveSolverInterface::InitializeStructure(Index dim, Index no
   if (!initialized_)
   {
     A_ = new ReSolve::matrix::Csr(dim, dim, nonzeros);
-    if (val_ != NULL)
-    {
-      delete[] val_;
-    }
+    delete[] val_;
     val_ = new Number[nonzeros];
 
-    A_->setDataPointers(const_cast<int*>(ia), const_cast<int*>(ja), val_, ReSolve::memory::HOST);
-    resolve_KLU_->setup(A_);
+    if( A_->setDataPointers(const_cast<Index*>(ia), const_cast<Index*>(ja), val_, ReSolve::memory::HOST) != 0)
+    {
+      Jnlst().Printf(
+         J_ERROR,
+         J_LINEAR_ALGEBRA,
+         "Failed to attach Ipopt matrix storage to ReSolve.\n");
+      return SYMSOLVER_FATAL_ERROR;
+    }
+#if RESOLVE_WITH_GPU
+     if( method_ != resolve_klu
+         && A_->allocateMatrixData(ReSolve::memory::DEVICE) != 0 )
+     {
+        Jnlst().Printf(
+           J_ERROR,
+           J_LINEAR_ALGEBRA,
+           "Failed to allocate ReSolve matrix device storage.\n");
+        return SYMSOLVER_FATAL_ERROR;
+     }
+#endif
 
-    vec_rhs_ = new ReSolve::vector::Vector(A_->getNumRows());
-    vec_x_ = new ReSolve::vector::Vector(A_->getNumRows());
+     if( resolve_KLU_->setup(A_) != 0 )
+     {
+        Jnlst().Printf(
+           J_ERROR,
+           J_LINEAR_ALGEBRA,
+           "Failed to set up the ReSolve KLU solver.\n");
+        return SYMSOLVER_FATAL_ERROR;
+     }
 
-    vec_x_->allocate(ReSolve::memory::HOST); // for KLU
+     vec_rhs_ = new ReSolve::vector::Vector(A_->getNumRows());
+     vec_x_ = new ReSolve::vector::Vector(A_->getNumRows());
+
+     if( vec_rhs_->allocate(ReSolve::memory::HOST) != 0
+         || vec_x_->allocate(ReSolve::memory::HOST) != 0 )
+     {
+        Jnlst().Printf(
+           J_ERROR,
+           J_LINEAR_ALGEBRA,
+           "Failed to allocate ReSolve host vectors.\n");
+        return SYMSOLVER_FATAL_ERROR;
+     }
+
+#if RESOLVE_WITH_GPU
+     if( method_ != resolve_klu )
+     {
+        if( vec_rhs_->allocate(ReSolve::memory::DEVICE) != 0
+            || vec_x_->allocate(ReSolve::memory::DEVICE) != 0 )
+        {
+          Jnlst().Printf(
+             J_ERROR,
+             J_LINEAR_ALGEBRA,
+             "Failed to allocate ReSolve device vectors.\n");
+          return SYMSOLVER_FATAL_ERROR;
+        }
+     }
+#endif
   }
-
   factorize_ = true;
   n_iteration_ = 0;
 
@@ -276,21 +377,33 @@ ESymSolverStatus ReSolveSolverInterface::MultiSolve(bool new_matrix, const Index
 
   bool full_factor_done = false;
 
-  // Get Data from CPU and update the A Matrix
+  (void)ia;
+  (void)ja;
 
-  A_->setDataPointers(const_cast<int*>(ia), const_cast<int*>(ja),  const_cast<Number*>(A_->getValues(ReSolve::memory::HOST)), ReSolve::memory::HOST);
+  if( new_matrix )
+  {
+     if( A_->setUpdated(ReSolve::memory::HOST) != 0 )
+     {
+        Jnlst().Printf(
+           J_ERROR,
+           J_LINEAR_ALGEBRA,
+           "Failed to mark the ReSolve host matrix as updated.\n");
+        return SYMSOLVER_FATAL_ERROR;
+     }
 
 #if RESOLVE_WITH_GPU
-#if RESOLVE_WITH_CUDA
-  if (method_ == resolve_rf || method_ == resolve_rf_fgmres || method_ == resolve_glu) {
-    A_->syncData(ReSolve::memory::DEVICE);
-  }
-#else
-  if (method_ == resolve_rf || method_ == resolve_rf_fgmres) {
-    A_->syncData(ReSolve::memory::DEVICE);
-  }
+     if( method_ != resolve_klu
+         && A_->syncData(ReSolve::memory::DEVICE) != 0 )
+     {
+        Jnlst().Printf(
+           J_ERROR,
+           J_LINEAR_ALGEBRA,
+           "Failed to synchronize the ReSolve matrix "
+           "to the device.\n");
+        return SYMSOLVER_FATAL_ERROR;
+     }
 #endif
-#endif
+  }
 
   // FACTORIZE
 
@@ -487,7 +600,14 @@ ESymSolverStatus ReSolveSolverInterface::MultiSolve(bool new_matrix, const Index
       }
 
       // Copy rhs_vals to vec_rhs
-      vec_rhs_->copyDataFrom(rhs_vals, ReSolve::memory::HOST, ReSolve::memory::HOST);
+      if (vec_rhs_->copyFromExternal(rhs_vals, ReSolve::memory::HOST, ReSolve::memory::HOST) != 0)
+      {
+        Jnlst().Printf(
+           J_ERROR,
+           J_LINEAR_ALGEBRA,
+           "Failed to copy rhs data to ReSolve host storage.\n");
+        return SYMSOLVER_FATAL_ERROR;
+      }
       status = resolve_KLU_->solve(vec_rhs_, vec_x_);
       //printf("Solving using KLU!\n");
       if (status != 0)
@@ -524,10 +644,13 @@ ESymSolverStatus ReSolveSolverInterface::MultiSolve(bool new_matrix, const Index
         delete U;
       }
       
-      if (method_ == resolve_rf_fgmres)
+      if (method_ == resolve_rf_fgmres && resolve_FGMRES_->setup(A_) != 0)
       {
-        resolve_FGMRES_->setup(A_);
-        resolve_FGMRES_->setupPreconditioner("CuSolverRf", resolve_Rf_);
+        Jnlst().Printf(
+           J_ERROR,
+           J_LINEAR_ALGEBRA,
+           "Failed to set up ReSolve FGMRES.\n");
+        return SYMSOLVER_FATAL_ERROR;
       }
 # else
 
@@ -538,16 +661,24 @@ ESymSolverStatus ReSolveSolverInterface::MultiSolve(bool new_matrix, const Index
         ReSolve::matrix::Csc* U = (ReSolve::matrix::Csc*)resolve_KLU_->getUFactor();
         ReSolve::index_type* P = resolve_KLU_->getPOrdering();
         ReSolve::index_type* Q = resolve_KLU_->getQOrdering();
-        vec_rhs_->copyDataFrom(rhs_vals, ReSolve::memory::HOST, ReSolve::memory::DEVICE);
+        if (vec_rhs_->copyFromExternal(rhs_vals, ReSolve::memory::HOST, ReSolve::memory::DEVICE) != 0)
+        {
+          Jnlst().Printf(
+             J_ERROR,
+             J_LINEAR_ALGEBRA,
+             "Failed to copy rhs data to ReSolve device storage.\n");
+          return SYMSOLVER_FATAL_ERROR;
+        }
         resolve_Rf_->setup(A_, L, U, P, Q, vec_rhs_);
       }
 
-      if (method_ == resolve_rf_fgmres)
+      if (method_ == resolve_rf_fgmres && resolve_FGMRES_->setup(A_) != 0)
       {
-        std::cout << "about to set FGMRES" << std::endl;
-        GS_->setup(A_->getNumRows(), resolve_FGMRES_->getRestart());
-        resolve_FGMRES_->setup(A_);
-        resolve_FGMRES_->setupPreconditioner("LU", resolve_Rf_);
+        Jnlst().Printf(
+           J_ERROR,
+           J_LINEAR_ALGEBRA,
+           "Failed to set up ReSolve FGMRES.\n");
+        return SYMSOLVER_FATAL_ERROR;
       }
 # endif
     }
@@ -560,8 +691,15 @@ ESymSolverStatus ReSolveSolverInterface::MultiSolve(bool new_matrix, const Index
     if (method_ == resolve_glu || method_ == resolve_rf || method_ == resolve_rf_fgmres)
     {
       // Copy rhs_vals to vec_rhs cuda
-      vec_rhs_->copyDataFrom(rhs_vals, ReSolve::memory::HOST, ReSolve::memory::DEVICE);
-      
+      if (vec_rhs_->copyFromExternal(rhs_vals, ReSolve::memory::HOST, ReSolve::memory::DEVICE) != 0)
+      {
+        Jnlst().Printf(
+           J_ERROR,
+           J_LINEAR_ALGEBRA,
+           "Failed to copy rhs data to ReSolve device storage.\n");
+        return SYMSOLVER_FATAL_ERROR;
+      }
+
       if (method_ == resolve_glu)
       {      
         status = resolve_GLU_->solve(vec_rhs_, vec_x_);
@@ -595,14 +733,28 @@ ESymSolverStatus ReSolveSolverInterface::MultiSolve(bool new_matrix, const Index
       }
 
       // Copy vec_x cuda to vec_x in cpu
-      vec_x_->copyDataFrom(vec_x_->getData(ReSolve::memory::DEVICE), ReSolve::memory::DEVICE, ReSolve::memory::HOST);
+      if (vec_x_->syncData(ReSolve::memory::HOST) != 0)
+      {
+        Jnlst().Printf(
+           J_ERROR,
+           J_LINEAR_ALGEBRA,
+           "Failed to synchronize the Resolve solution to the host.\n");
+        return SYMSOLVER_FATAL_ERROR;
+      }
       matrix_handler_->setValuesChanged(true, ReSolve::memory::DEVICE);
     }
 # else
     if (method_ == resolve_rf || method_ == resolve_rf_fgmres)
     {
       // Copy rhs_vals to vec_rhs cuda
-      vec_rhs_->copyDataFrom(rhs_vals, ReSolve::memory::HOST, ReSolve::memory::DEVICE);
+      if (vec_rhs_->copyFromExternal(rhs_vals, ReSolve::memory::HOST, ReSolve::memory::DEVICE) != 0)
+      {
+        Jnlst().Printf(
+           J_ERROR,
+           J_LINEAR_ALGEBRA,
+           "Failed to copy rhs data to ReSolve device storage.\n");
+        return SYMSOLVER_FATAL_ERROR;
+      }
 
       int status = resolve_Rf_->solve(vec_rhs_, vec_x_);
       if (status != 0)
@@ -614,7 +766,14 @@ ESymSolverStatus ReSolveSolverInterface::MultiSolve(bool new_matrix, const Index
       {
 
         resolve_FGMRES_->resetMatrix(A_);
-        vec_rhs_->copyDataFrom(rhs_vals, ReSolve::memory::HOST, ReSolve::memory::DEVICE);
+        if (vec_rhs_->copyFromExternal(rhs_vals, ReSolve::memory::HOST, ReSolve::memory::DEVICE) != 0)
+        {
+          Jnlst().Printf(
+             J_ERROR,
+             J_LINEAR_ALGEBRA,
+             "Failed to copy rhs data to ReSolve device storage.\n");
+          return SYMSOLVER_FATAL_ERROR;
+        }
         status = resolve_FGMRES_->solve(vec_rhs_, vec_x_);
         if (status != 0)
         {
@@ -623,7 +782,14 @@ ESymSolverStatus ReSolveSolverInterface::MultiSolve(bool new_matrix, const Index
       }
 
 	  // Copy vec_x cuda to vec_x in cpu
-      vec_x_->copyDataFrom(vec_x_->getData(ReSolve::memory::DEVICE), ReSolve::memory::DEVICE, ReSolve::memory::HOST);
+      if (vec_x_->syncData(ReSolve::memory::HOST) != 0)
+      {
+        Jnlst().Printf(
+           J_ERROR,
+           J_LINEAR_ALGEBRA,
+           "Failed to synchronize the Resolve solution to the host.\n");
+        return SYMSOLVER_FATAL_ERROR;
+      }
     }
 #endif
 
@@ -655,7 +821,14 @@ ESymSolverStatus ReSolveSolverInterface::MultiSolve(bool new_matrix, const Index
       }
 
       // Copy rhs_vals to vec_rhs cuda
-      vec_rhs_->copyDataFrom(rhs_vals, ReSolve::memory::HOST, ReSolve::memory::HOST);
+      if (vec_rhs_->copyFromExternal(rhs_vals, ReSolve::memory::HOST, ReSolve::memory::HOST) != 0)
+      {
+        Jnlst().Printf(
+           J_ERROR,
+           J_LINEAR_ALGEBRA,
+           "Failed to copy rhs data to ReSolve host storage.\n");
+        return SYMSOLVER_FATAL_ERROR;
+      }
       int status = resolve_KLU_->solve(vec_rhs_, vec_x_);
       if (status != 0)
       {
@@ -665,7 +838,14 @@ ESymSolverStatus ReSolveSolverInterface::MultiSolve(bool new_matrix, const Index
   }
 
   // copy vec_x to rhs_vals
-  memcpy(rhs_vals, vec_x_->getData(ReSolve::memory::HOST), (ndim_) * sizeof(ReSolve::real_type));
+  if (vec_x_->copyToExternal(rhs_vals, ReSolve::memory::HOST, ReSolve::memory::HOST) != 0)
+  {
+    Jnlst().Printf(
+       J_ERROR,
+       J_LINEAR_ALGEBRA,
+       "Failed to copy the Resolve solution to Ipopt.\n");
+    return SYMSOLVER_FATAL_ERROR;
+  }
 
   if (HaveIpData())
   {

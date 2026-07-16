@@ -21,6 +21,7 @@
 #include <resolve/vector/Vector.hpp>
 #include <resolve/vector/VectorHandler.hpp>
 #include <resolve/GramSchmidt.hpp>
+#include <resolve/PreconditionerLU.hpp>
 
 #include <resolve/LinSolverDirectKLU.hpp>
 #include <resolve/workspace/LinAlgWorkspace.hpp>
@@ -142,6 +143,10 @@ private:
   int n_iteration_;
 
   int k_;
+  Number pivot_tol_;
+  Index ordering_;
+  bool halt_if_singular_;
+
   Number rcond_val_;
   bool use_rcond_;
 
@@ -162,6 +167,7 @@ private:
   ReSolve::LinSolverDirectCuSolverGLU* resolve_GLU_;
 # endif
   ReSolve::GramSchmidt* GS_;
+  ReSolve::PreconditionerLU* resolve_preconditioner_;
   ReSolve::LinSolverIterativeFGMRES* resolve_FGMRES_;
 #endif
 
