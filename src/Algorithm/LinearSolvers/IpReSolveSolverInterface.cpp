@@ -529,21 +529,29 @@ ESymSolverStatus ReSolveSolverInterface::MultiSolve(bool new_matrix, const Index
     }
     else if (method_ == resolve_rf || method_ == resolve_rf_fgmres)
     {
-      //std::cout << "%" << n_iteration_ << "%" << "RF->refactorize()" << std::endl; 
       status_refactor = resolve_Rf_->refactorize();
-      if (status != 0)
+      if (status_refactor != 0)
       {
-        std::cout << "CUSOLVER RF refactorization status: " << status_refactor << std::endl;
+        Jnlst().Printf(
+           J_ERROR,
+           J_LINEAR_ALGEBRA,
+           "ReSolve CUDA RF refactorization failed with status %d.\n",
+           status_refactor);
+        return SYMSOLVER_FATAL_ERROR;
       }
     }
 # else
     if (method_ == resolve_rf || method_ == resolve_rf_fgmres)
     {
-      //std::cout << "%" << n_iteration_ << "%" << "RF->refactorize()" << std::endl;
-      int status = resolve_Rf_->refactorize();
+      status = resolve_Rf_->refactorize();
       if (status != 0)
       {
-        std::cout << "ROCSOLVER RF refactorization status: " << status << std::endl;
+        Jnlst().Printf(
+           J_ERROR,
+           J_LINEAR_ALGEBRA,
+           "ReSolve HIP RF refactorization failed with status %d.\n",
+          status);
+        return SYMSOLVER_FATAL_ERROR;
       }
     }
 #endif
@@ -624,26 +632,32 @@ ESymSolverStatus ReSolveSolverInterface::MultiSolve(bool new_matrix, const Index
       {
         printf("CUDA: Iteration: %d: Setting up %s\n", n_iteration_, method_.c_str());
 
-        ReSolve::matrix::Csc* L_csc = (ReSolve::matrix::Csc*)resolve_KLU_->getLFactor();
-        ReSolve::matrix::Csc* U_csc = (ReSolve::matrix::Csc*)resolve_KLU_->getUFactor();
-        ReSolve::matrix::Csr* L = new ReSolve::matrix::Csr(L_csc->getNumRows(), L_csc->getNumColumns(), L_csc->getNnz());
-        ReSolve::matrix::Csr* U = new ReSolve::matrix::Csr(U_csc->getNumRows(), U_csc->getNumColumns(), U_csc->getNnz());
-        L_csc->syncData(ReSolve::memory::DEVICE);
-        U_csc->syncData(ReSolve::memory::DEVICE);
-        matrix_handler_->csc2csr(L_csc, L, ReSolve::memory::DEVICE);
-        matrix_handler_->csc2csr(U_csc, U, ReSolve::memory::DEVICE);
-        if (L == nullptr)
-        {
-          printf("ERROR");
-        }
+        ReSolve::matrix::Sparse* L = resolve_KLU_->getLFactor();
+        ReSolve::matrix::Sparse* U = resolve_KLU_->getUFactor();
         ReSolve::index_type* P = resolve_KLU_->getPOrdering();
         ReSolve::index_type* Q = resolve_KLU_->getQOrdering();
-        resolve_Rf_->setup(A_, L, U, P, Q);
 
-        delete L;
-        delete U;
+        if (L == nullptr || U == nullptr || P == nullptr || Q == nullptr)
+        {
+          Jnlst().Printf(
+             J_ERROR,
+             J_LINEAR_ALGEBRA,
+             "Failed to obtain KLU factors or permutations for ReSolve CUDA RF setup.\n");
+          return SYMSOLVER_FATAL_ERROR;
+        }
+
+        status = resolve_Rf_->setup(A_, L, U, P, Q);
+        if (status != 0)
+        {
+          Jnlst().Printf(
+             J_ERROR,
+             J_LINEAR_ALGEBRA,
+             "ReSolve CUDA RF setup failed with status %d.\n",
+             status);
+          return SYMSOLVER_FATAL_ERROR;
+        }
       }
-      
+
       if (method_ == resolve_rf_fgmres && resolve_FGMRES_->setup(A_) != 0)
       {
         Jnlst().Printf(
@@ -657,19 +671,42 @@ ESymSolverStatus ReSolveSolverInterface::MultiSolve(bool new_matrix, const Index
       if (method_ == resolve_rf || method_ == resolve_rf_fgmres)
       {
         printf("HIP: Iteration: %d: Setting up %s\n", n_iteration_, method_.c_str());
-        ReSolve::matrix::Csc* L = (ReSolve::matrix::Csc*)resolve_KLU_->getLFactor();
-        ReSolve::matrix::Csc* U = (ReSolve::matrix::Csc*)resolve_KLU_->getUFactor();
+        ReSolve::matrix::Sparse* L = resolve_KLU_->getLFactor();
+        ReSolve::matrix::Sparse* U = resolve_KLU_->getUFactor();
         ReSolve::index_type* P = resolve_KLU_->getPOrdering();
         ReSolve::index_type* Q = resolve_KLU_->getQOrdering();
-        if (vec_rhs_->copyFromExternal(rhs_vals, ReSolve::memory::HOST, ReSolve::memory::DEVICE) != 0)
+        if (L == nullptr || U == nullptr || P == nullptr || Q == nullptr)
+        {
+          Jnlst().Printf(
+            J_ERROR,
+            J_LINEAR_ALGEBRA,
+            "Failed to obtain KLU factors or permutations for ReSolve HIP RF setup.\n");
+          return SYMSOLVER_FATAL_ERROR;
+        }
+
+        if (vec_rhs_->copyFromExternal(
+              rhs_vals,
+              ReSolve::memory::HOST,
+              ReSolve::memory::DEVICE)
+            != 0)
+        {
+          Jnlst().Printf(
+            J_ERROR,
+            J_LINEAR_ALGEBRA,
+            "Failed to copy rhs data to ReSolve device storage.\n");
+          return SYMSOLVER_FATAL_ERROR;
+        }
+
+        status = resolve_Rf_->setup(A_, L, U, P, Q, vec_rhs_);
+        if (status != 0)
         {
           Jnlst().Printf(
              J_ERROR,
              J_LINEAR_ALGEBRA,
-             "Failed to copy rhs data to ReSolve device storage.\n");
+             "ReSolve HIP RF setup failed with status %d.\n",
+             status);
           return SYMSOLVER_FATAL_ERROR;
         }
-        resolve_Rf_->setup(A_, L, U, P, Q, vec_rhs_);
       }
 
       if (method_ == resolve_rf_fgmres && resolve_FGMRES_->setup(A_) != 0)
