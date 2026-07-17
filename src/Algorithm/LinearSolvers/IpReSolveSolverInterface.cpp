@@ -750,22 +750,48 @@ ESymSolverStatus ReSolveSolverInterface::MultiSolve(bool new_matrix, const Index
         status = resolve_Rf_->solve(vec_rhs_, vec_x_);
         if (status != 0)
         {
-            std::cout << "RF solve status: " << status << std::endl;
+          Jnlst().Printf(
+             J_ERROR,
+             J_LINEAR_ALGEBRA,
+             "ReSolve CUDA RF solve failed with status %d.\n",
+             status);
+          return SYMSOLVER_FATAL_ERROR;
         }
       }
       else if (method_ == resolve_rf_fgmres)
       {
-        int status = resolve_Rf_->solve(vec_rhs_, vec_x_);
+        status = resolve_Rf_->solve(vec_rhs_, vec_x_);
         if (status != 0)
         {
-            std::cout << "RF solve status: " << status << std::endl;
+          Jnlst().Printf(
+             J_ERROR,
+             J_LINEAR_ALGEBRA,
+             "ReSolve CUDA RF initial solve failed with status %d.\n",
+             status);
+          return SYMSOLVER_FATAL_ERROR;
         }
 
-        resolve_FGMRES_->resetMatrix(A_);
+        status = resolve_FGMRES_->resetMatrix(A_);
+        if (status != 0)
+        {
+          Jnlst().Printf(
+             J_ERROR,
+             J_LINEAR_ALGEBRA,
+             "Failed to reset the ReSolve CUDA FGMRES matrix "
+             "with status %d.\n",
+             status);
+          return SYMSOLVER_FATAL_ERROR;
+        }
+
         status = resolve_FGMRES_->solve(vec_rhs_, vec_x_);
         if (status != 0)
         {
-            std::cout << "RF_FGMRES solve status: " << status << std::endl;
+          Jnlst().Printf(
+             J_ERROR,
+             J_LINEAR_ALGEBRA,
+             "ReSolve CUDA FGMRES solve failed with status %d.\n",
+             status);
+          return SYMSOLVER_FATAL_ERROR;
         }
       }
 
@@ -793,28 +819,40 @@ ESymSolverStatus ReSolveSolverInterface::MultiSolve(bool new_matrix, const Index
         return SYMSOLVER_FATAL_ERROR;
       }
 
-      int status = resolve_Rf_->solve(vec_rhs_, vec_x_);
+      status = resolve_Rf_->solve(vec_rhs_, vec_x_);
       if (status != 0)
       {
-        std::cout << "RF solve status: " << status << std::endl;
+        Jnlst().Printf(
+           J_ERROR,
+           J_LINEAR_ALGEBRA,
+           "ReSolve HIP RF solve failed with status %d.\n",
+           status);
+        return SYMSOLVER_FATAL_ERROR;
       }
 
-	  if (method_ == resolve_rf_fgmres)
+      if (method_ == resolve_rf_fgmres)
       {
-
-        resolve_FGMRES_->resetMatrix(A_);
-        if (vec_rhs_->copyFromExternal(rhs_vals, ReSolve::memory::HOST, ReSolve::memory::DEVICE) != 0)
+        status = resolve_FGMRES_->resetMatrix(A_);
+        if (status != 0)
         {
           Jnlst().Printf(
              J_ERROR,
              J_LINEAR_ALGEBRA,
-             "Failed to copy rhs data to ReSolve device storage.\n");
+             "Failed to reset the ReSolve HIP FGMRES matrix "
+             "with status %d.\n",
+             status);
           return SYMSOLVER_FATAL_ERROR;
         }
+
         status = resolve_FGMRES_->solve(vec_rhs_, vec_x_);
         if (status != 0)
         {
-          std::cout << "RF_FGMRES solve status: " << status << std::endl;
+          Jnlst().Printf(
+             J_ERROR,
+             J_LINEAR_ALGEBRA,
+             "ReSolve HIP FGMRES solve failed with status %d.\n",
+             status);
+          return SYMSOLVER_FATAL_ERROR;
         }
       }
 
