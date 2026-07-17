@@ -12,6 +12,7 @@
 #include <iostream>
 
 #include "IpoptConfig.h"
+#include <resolve/resolve_defs.hpp>
 
 #include <resolve/matrix/Coo.hpp>
 #include <resolve/matrix/Csc.hpp>
@@ -26,10 +27,10 @@
 #include <resolve/LinSolverDirectKLU.hpp>
 #include <resolve/workspace/LinAlgWorkspace.hpp>
 
-#if RESOLVE_WITH_GPU
+#ifdef RESOLVE_USE_GPU
 #include <resolve/LinSolverIterativeFGMRES.hpp>
 
-#if RESOLVE_WITH_CUDA
+#ifdef RESOLVE_USE_CUDA
 #include <resolve/LinSolverDirectCuSolverGLU.hpp>
 #include <resolve/LinSolverDirectCuSolverRf.hpp>
 using workspace_type = ReSolve::LinAlgWorkspaceCUDA;
@@ -57,8 +58,8 @@ namespace Ipopt
 
 static const std::string resolve_klu = "klu";
 
-#if RESOLVE_WITH_GPU
-#if RESOLVE_WITH_CUDA
+#ifdef RESOLVE_USE_GPU
+#ifdef RESOLVE_USE_CUDA
 static const std::string resolve_glu = "glu";
 # endif
 static const std::string resolve_rf = "rf";
@@ -160,10 +161,10 @@ private:
   ReSolve::vector::Vector* vec_x_;
 
 
-#if RESOLVE_WITH_GPU
+#ifdef RESOLVE_USE_GPU
   workspace_type* workspace_GPU_;
   rf_solver* resolve_Rf_;
-# if RESOLVE_WITH_CUDA
+# ifdef RESOLVE_USE_CUDA
   ReSolve::LinSolverDirectCuSolverGLU* resolve_GLU_;
 # endif
   ReSolve::GramSchmidt* GS_;

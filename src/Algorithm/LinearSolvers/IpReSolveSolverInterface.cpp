@@ -49,10 +49,10 @@ ReSolveSolverInterface::ReSolveSolverInterface()
     A_(NULL),
     vec_rhs_(NULL),
     vec_x_(NULL),
-#if RESOLVE_WITH_GPU
+#ifdef RESOLVE_USE_GPU
     workspace_GPU_(NULL),
     resolve_Rf_(NULL),
-# if RESOLVE_WITH_CUDA
+# ifdef RESOLVE_USE_CUDA
     resolve_GLU_(NULL),
 # endif
     GS_(NULL),
@@ -63,9 +63,9 @@ ReSolveSolverInterface::ReSolveSolverInterface()
     vector_handler_(NULL)
 {
   DBG_START_METH("ReSolveSolverInterface::ReSolveSolverInterface()", dbg_verbosity);
-#if RESOLVE_WITH_GPU
+#ifdef RESOLVE_USE_GPU
   printf("Resolve with GPU.\n");
-# if RESOLVE_WITH_CUDA
+# ifdef RESOLVE_USE_CUDA
   printf("Resolve with CUDA.\n");
 # else
   printf("Resolve with HIP.\n");
@@ -78,12 +78,12 @@ ReSolveSolverInterface::ReSolveSolverInterface()
 ReSolveSolverInterface::~ReSolveSolverInterface()
 {
   DBG_START_METH("ReSolveSolverInterface::~ReSolveSolverInterface()", dbg_verbosity);
-#if RESOLVE_WITH_GPU
+#ifdef RESOLVE_USE_GPU
   delete resolve_FGMRES_;
   delete resolve_preconditioner_;
   delete GS_;
 
-# if RESOLVE_WITH_CUDA
+# ifdef RESOLVE_USE_CUDA
   delete resolve_GLU_;
 # endif
   delete resolve_Rf_;
@@ -94,7 +94,7 @@ ReSolveSolverInterface::~ReSolveSolverInterface()
   delete matrix_handler_;
   delete vector_handler_;
 
-#if RESOLVE_WITH_GPU
+#ifdef RESOLVE_USE_GPU
   delete workspace_GPU_;
 #endif
   delete workspace_CPU_;
@@ -113,8 +113,8 @@ void ReSolveSolverInterface::RegisterOptions(SmartPtr<RegisteredOptions> roption
   options.push_back(resolve_klu);
   descrs.push_back("Use KLU");
 
-#if RESOLVE_WITH_GPU
-# if RESOLVE_WITH_CUDA
+#ifdef RESOLVE_USE_GPU
+# ifdef RESOLVE_USE_CUDA
   options.push_back(resolve_glu);
   descrs.push_back("Use GLU");
 # endif
@@ -234,7 +234,7 @@ ESymSolverStatus ReSolveSolverInterface::InitializeStructure(Index dim, Index no
       vector_handler_ = new ReSolve::VectorHandler(workspace_CPU_);
     }
 
-#if RESOLVE_WITH_GPU
+#ifdef RESOLVE_USE_GPU
     else
     {
       printf("Resolve::GPU Setup\n");
@@ -250,7 +250,7 @@ ESymSolverStatus ReSolveSolverInterface::InitializeStructure(Index dim, Index no
         printf("Resolve::RF Setup\n");
         resolve_Rf_ = new rf_solver(workspace_GPU_);
       }
-# if RESOLVE_WITH_CUDA
+# ifdef RESOLVE_USE_CUDA
       else if (method_ == resolve_glu)
       {
         printf("Resolve::GLU Setup\n");
@@ -310,7 +310,7 @@ ESymSolverStatus ReSolveSolverInterface::InitializeStructure(Index dim, Index no
          "Failed to attach Ipopt matrix storage to ReSolve.\n");
       return SYMSOLVER_FATAL_ERROR;
     }
-#if RESOLVE_WITH_GPU
+#ifdef RESOLVE_USE_GPU
      if( method_ != resolve_klu
          && A_->allocateMatrixData(ReSolve::memory::DEVICE) != 0 )
      {
@@ -344,7 +344,7 @@ ESymSolverStatus ReSolveSolverInterface::InitializeStructure(Index dim, Index no
         return SYMSOLVER_FATAL_ERROR;
      }
 
-#if RESOLVE_WITH_GPU
+#ifdef RESOLVE_USE_GPU
      if( method_ != resolve_klu )
      {
         if( vec_rhs_->allocate(ReSolve::memory::DEVICE) != 0
@@ -391,7 +391,7 @@ ESymSolverStatus ReSolveSolverInterface::MultiSolve(bool new_matrix, const Index
         return SYMSOLVER_FATAL_ERROR;
      }
 
-#if RESOLVE_WITH_GPU
+#ifdef RESOLVE_USE_GPU
      if( method_ != resolve_klu
          && A_->syncData(ReSolve::memory::DEVICE) != 0 )
      {
@@ -460,7 +460,7 @@ ESymSolverStatus ReSolveSolverInterface::MultiSolve(bool new_matrix, const Index
     // GLU can be setup as early as possible
     if (n_iteration_ == k_ - 1)
     {
-#if RESOLVE_WITH_CUDA
+#ifdef RESOLVE_USE_CUDA
       if (method_ == resolve_glu)
       {
         printf("Iteration: %d: Setting Up GLU\n", n_iteration_);
@@ -516,7 +516,7 @@ ESymSolverStatus ReSolveSolverInterface::MultiSolve(bool new_matrix, const Index
       IpData().TimingStats().LinearSystemFactorization().Start();
     }
 
-# if RESOLVE_WITH_CUDA
+# ifdef RESOLVE_USE_CUDA
     // Actual Refactorize
     if (method_ == resolve_glu)
     {
@@ -540,7 +540,7 @@ ESymSolverStatus ReSolveSolverInterface::MultiSolve(bool new_matrix, const Index
         return SYMSOLVER_FATAL_ERROR;
       }
     }
-# else
+# elif defined(RESOLVE_USE_HIP)
     if (method_ == resolve_rf || method_ == resolve_rf_fgmres)
     {
       status = resolve_Rf_->refactorize();
@@ -627,7 +627,7 @@ ESymSolverStatus ReSolveSolverInterface::MultiSolve(bool new_matrix, const Index
     // Setup RF here
     if (n_iteration_ == (k_ - 1))
     {
-# if RESOLVE_WITH_CUDA
+# ifdef RESOLVE_USE_CUDA
       if (method_ == resolve_rf || method_ == resolve_rf_fgmres)
       {
         printf("CUDA: Iteration: %d: Setting up %s\n", n_iteration_, method_.c_str());
@@ -666,8 +666,7 @@ ESymSolverStatus ReSolveSolverInterface::MultiSolve(bool new_matrix, const Index
            "Failed to set up ReSolve FGMRES.\n");
         return SYMSOLVER_FATAL_ERROR;
       }
-# else
-
+# elif defined(RESOLVE_USE_HIP)
       if (method_ == resolve_rf || method_ == resolve_rf_fgmres)
       {
         printf("HIP: Iteration: %d: Setting up %s\n", n_iteration_, method_.c_str());
@@ -723,8 +722,7 @@ ESymSolverStatus ReSolveSolverInterface::MultiSolve(bool new_matrix, const Index
   else // After k iteration only solve
   {
     // Every 10 iteration setup again with full factorization? Already factorization done.
-# if RESOLVE_WITH_CUDA
-
+# ifdef RESOLVE_USE_CUDA
     if (method_ == resolve_glu || method_ == resolve_rf || method_ == resolve_rf_fgmres)
     {
       // Copy rhs_vals to vec_rhs cuda
@@ -806,7 +804,7 @@ ESymSolverStatus ReSolveSolverInterface::MultiSolve(bool new_matrix, const Index
       }
       matrix_handler_->setValuesChanged(true, ReSolve::memory::DEVICE);
     }
-# else
+# elif defined(RESOLVE_USE_HIP)
     if (method_ == resolve_rf || method_ == resolve_rf_fgmres)
     {
       // Copy rhs_vals to vec_rhs cuda
