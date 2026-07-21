@@ -208,6 +208,31 @@ bool ReSolveSolverInterface::InitializeImpl(const OptionsList& options, const st
   options.GetNumericValue("resolve_rcond_val", rcond_val_, prefix);
   options.GetBoolValue("resolve_use_rcond", use_rcond_, prefix);
 
+  bool method_available = (method_ == resolve_klu);
+
+#ifdef RESOLVE_USE_GPU
+  method_available =
+    method_available
+    || method_ == resolve_rf
+    || method_ == resolve_rf_fgmres;
+
+# ifdef RESOLVE_USE_CUDA
+  method_available =
+    method_available
+    || method_ == resolve_glu;
+# endif
+#endif
+
+  if (!method_available)
+  {
+    Jnlst().Printf(
+      J_ERROR,
+      J_LINEAR_ALGEBRA,
+      "ReSolve method '%s' is not available for this build.\n",
+      method_.c_str());
+    return false;
+  }
+
   return true;
 }
 
@@ -302,6 +327,8 @@ ESymSolverStatus ReSolveSolverInterface::InitializeStructure(Index dim, Index no
     delete[] val_;
     val_ = new Number[nonzeros];
 
+    // ReSolve borrows the matrix storage and does not take ownership.
+    // Ipopt owns ia/ja, while this interface owns val_.
     if( A_->setDataPointers(const_cast<Index*>(ia), const_cast<Index*>(ja), val_, ReSolve::memory::HOST) != 0)
     {
       Jnlst().Printf(
@@ -380,7 +407,9 @@ ESymSolverStatus ReSolveSolverInterface::MultiSolve(bool new_matrix, const Index
   (void)ia;
   (void)ja;
 
-  if( new_matrix )
+  // Ipopt updates val_ directly, so mark the host matrix current before
+  // synchronizing updated values to the GPU.
+  if (new_matrix)
   {
      if( A_->setUpdated(ReSolve::memory::HOST) != 0 )
      {
@@ -617,10 +646,14 @@ ESymSolverStatus ReSolveSolverInterface::MultiSolve(bool new_matrix, const Index
         return SYMSOLVER_FATAL_ERROR;
       }
       status = resolve_KLU_->solve(vec_rhs_, vec_x_);
-      //printf("Solving using KLU!\n");
       if (status != 0)
       {
-        std::cout << "KLU solve status: " << status << std::endl;
+        Jnlst().Printf(
+          J_ERROR,
+          J_LINEAR_ALGEBRA,
+          "ReSolve KLU solve failed with status %d.\n",
+          status);
+        return SYMSOLVER_FATAL_ERROR;
       }
     }
 
@@ -793,7 +826,8 @@ ESymSolverStatus ReSolveSolverInterface::MultiSolve(bool new_matrix, const Index
         }
       }
 
-      // Copy vec_x cuda to vec_x in cpu
+      // GPU solvers leave the current solution on the device; synchronize it
+      // to host memory before copying the solution back to Ipopt.
       if (vec_x_->syncData(ReSolve::memory::HOST) != 0)
       {
         Jnlst().Printf(
@@ -854,7 +888,8 @@ ESymSolverStatus ReSolveSolverInterface::MultiSolve(bool new_matrix, const Index
         }
       }
 
-	  // Copy vec_x cuda to vec_x in cpu
+      // GPU solvers leave the current solution on the device; synchronize it
+      // to host memory before copying the solution back to Ipopt.
       if (vec_x_->syncData(ReSolve::memory::HOST) != 0)
       {
         Jnlst().Printf(
@@ -905,7 +940,12 @@ ESymSolverStatus ReSolveSolverInterface::MultiSolve(bool new_matrix, const Index
       int status = resolve_KLU_->solve(vec_rhs_, vec_x_);
       if (status != 0)
       {
-        std::cout << "KLU solve status: " << status << std::endl;
+        Jnlst().Printf(
+          J_ERROR,
+          J_LINEAR_ALGEBRA,
+          "ReSolve KLU solve failed with status %d.\n",
+          status);
+        return SYMSOLVER_FATAL_ERROR;
       }
     }
   }

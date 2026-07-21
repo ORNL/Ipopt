@@ -14,8 +14,10 @@
 #include "IpoptConfig.h"
 #include <resolve/resolve_defs.hpp>
 
-#include <resolve/matrix/Coo.hpp>
-#include <resolve/matrix/Csc.hpp>
+#if defined(RESOLVE_USE_GPU) && !defined(RESOLVE_USE_CUDA) && !defined(RESOLVE_USE_HIP)
+# error "ReSolve GPU support requires either CUDA or HIP."
+#endif
+
 #include <resolve/matrix/Csr.hpp>
 #include <resolve/matrix/MatrixHandler.hpp>
 #include <resolve/matrix/io.hpp>
