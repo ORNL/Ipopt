@@ -170,7 +170,7 @@ void ReSolveSolverInterface::RegisterOptions(SmartPtr<RegisteredOptions> roption
   roptions->AddIntegerOption("resolve_n_skip_refactoring",                      //
                              "How many iterations to skip refactoring",         //
                              1,                                                 //
-                             "Integer, Start Refactoring after k-th iteration", //
+                             "Number of initial KLU iterations before switching to the selected refactorization method. Must be at least 1.", //
                              false);
 
   roptions->AddBoolOption("resolve_use_rcond", //
@@ -201,6 +201,18 @@ bool ReSolveSolverInterface::InitializeImpl(const OptionsList& options, const st
 
   Index n_skip_refactoring;
   options.GetIntegerValue("resolve_n_skip_refactoring", n_skip_refactoring, prefix);
+
+  // ReSolve's GPU refactorization methods require an initial KLU solve
+  // to construct the factors and permutations used during setup.
+  if (n_skip_refactoring < 1)
+  {
+    Jnlst().Printf(
+      J_ERROR,
+      J_LINEAR_ALGEBRA,
+      "resolve_n_skip_refactoring must be at least 1.\n");
+    return false;
+  }
+
   k_ = n_skip_refactoring;
 
   options.GetBoolValue("resolve_halt_if_singular", halt_if_singular_, prefix);
@@ -563,7 +575,12 @@ ESymSolverStatus ReSolveSolverInterface::MultiSolve(bool new_matrix, const Index
       status = resolve_GLU_->refactorize();
       if (status != 0)
       {
-        std::cout << "CUSOLVER GLU refactorization status: " << status << std::endl;
+        Jnlst().Printf(
+          J_ERROR,
+          J_LINEAR_ALGEBRA,
+          "ReSolve CUDA GLU refactorization failed with status %d.\n",
+          status);
+        return SYMSOLVER_FATAL_ERROR;
       }
     }
     else if (method_ == resolve_rf || method_ == resolve_rf_fgmres)
@@ -601,7 +618,12 @@ ESymSolverStatus ReSolveSolverInterface::MultiSolve(bool new_matrix, const Index
       status = resolve_KLU_->refactorize();
       if (status != 0)
       {
-        std::cout << "KLU refactorization status: " << status << std::endl;
+        Jnlst().Printf(
+          J_ERROR,
+          J_LINEAR_ALGEBRA,
+          "ReSolve KLU refactorization failed with status %d.\n",
+          status);
+        return SYMSOLVER_FATAL_ERROR;
       }
     }
     re_factorize_ = false;
