@@ -7,9 +7,11 @@
 #include "IpReSolveSolverInterface.hpp"
 #include "IpoptConfig.h"
 
+#include <algorithm>
 #include <cmath>
 #include <iostream>
 #include <type_traits>
+#include <vector>
 
 namespace Ipopt
 {
@@ -399,6 +401,14 @@ ESymSolverStatus ReSolveSolverInterface::MultiSolve(bool new_matrix, const Index
 {
   DBG_START_METH("ReSolveSolverInterface::MultiSolve", dbg_verbosity);
 
+  std::vector<Number> solution_vals;
+
+  if (nrhs > 1)
+  {
+    solution_vals.resize(
+      static_cast<std::size_t>(nrhs) * static_cast<std::size_t>(ndim_));
+  }
+
   int status;
   int status_refactor = 0;
 
@@ -636,24 +646,40 @@ ESymSolverStatus ReSolveSolverInterface::MultiSolve(bool new_matrix, const Index
         }
       }
 
-      // Copy rhs_vals to vec_rhs
-      if (vec_rhs_->copyFromExternal(rhs_vals, ReSolve::memory::HOST, ReSolve::memory::HOST) != 0)
+      for (Index irhs = 0; irhs < nrhs; ++irhs)
       {
-        Jnlst().Printf(
-           J_ERROR,
-           J_LINEAR_ALGEBRA,
-           "Failed to copy rhs data to ReSolve host storage.\n");
-        return SYMSOLVER_FATAL_ERROR;
-      }
-      status = resolve_KLU_->solve(vec_rhs_, vec_x_);
-      if (status != 0)
-      {
-        Jnlst().Printf(
-          J_ERROR,
-          J_LINEAR_ALGEBRA,
-          "ReSolve KLU solve failed with status %d.\n",
-          status);
-        return SYMSOLVER_FATAL_ERROR;
+        Number* rhs = rhs_vals + irhs * ndim_;
+        // Copy the current RHS to ReSolve
+        if (vec_rhs_->copyFromExternal(rhs, ReSolve::memory::HOST, ReSolve::memory::HOST) != 0)
+        {
+          Jnlst().Printf(
+            J_ERROR,
+            J_LINEAR_ALGEBRA,
+            "Failed to copy rhs data to ReSolve host storage.\n");
+          return SYMSOLVER_FATAL_ERROR;
+        }
+        status = resolve_KLU_->solve(vec_rhs_, vec_x_);
+        if (status != 0)
+        {
+          Jnlst().Printf(
+            J_ERROR,
+            J_LINEAR_ALGEBRA,
+            "ReSolve KLU solve failed with status %d.\n",
+            status);
+          return SYMSOLVER_FATAL_ERROR;
+        }
+        if (nrhs > 1)
+        {
+          Number* solution = solution_vals.data() + irhs * ndim_;
+          if (vec_x_->copyToExternal(solution, ReSolve::memory::HOST, ReSolve::memory::HOST) != 0)
+          {
+            Jnlst().Printf(
+              J_ERROR,
+              J_LINEAR_ALGEBRA,
+              "Failed to copy the ReSolve solution to temporary storage.\n");
+            return SYMSOLVER_FATAL_ERROR;
+          }
+        }
       }
     }
 
@@ -758,145 +784,186 @@ ESymSolverStatus ReSolveSolverInterface::MultiSolve(bool new_matrix, const Index
 # ifdef RESOLVE_USE_CUDA
     if (method_ == resolve_glu || method_ == resolve_rf || method_ == resolve_rf_fgmres)
     {
-      // Copy rhs_vals to vec_rhs cuda
-      if (vec_rhs_->copyFromExternal(rhs_vals, ReSolve::memory::HOST, ReSolve::memory::DEVICE) != 0)
+      for (Index irhs = 0; irhs < nrhs; ++irhs)
       {
-        Jnlst().Printf(
-           J_ERROR,
-           J_LINEAR_ALGEBRA,
-           "Failed to copy rhs data to ReSolve device storage.\n");
-        return SYMSOLVER_FATAL_ERROR;
-      }
-
-      if (method_ == resolve_glu)
-      {      
-        status = resolve_GLU_->solve(vec_rhs_, vec_x_);
-        if (status != 0)
-        {
-            std::cout << "GLU solve status: " << status << std::endl;
-        }
-      }
-      else if (method_ == resolve_rf)
-      {
-        status = resolve_Rf_->solve(vec_rhs_, vec_x_);
-        if (status != 0)
+        Number* rhs = rhs_vals + irhs * ndim_;
+        // Copy the current RHS to ReSolve device storage
+        if (vec_rhs_->copyFromExternal(rhs, ReSolve::memory::HOST, ReSolve::memory::DEVICE) != 0)
         {
           Jnlst().Printf(
-             J_ERROR,
-             J_LINEAR_ALGEBRA,
-             "ReSolve CUDA RF solve failed with status %d.\n",
-             status);
-          return SYMSOLVER_FATAL_ERROR;
-        }
-      }
-      else if (method_ == resolve_rf_fgmres)
-      {
-        status = resolve_Rf_->solve(vec_rhs_, vec_x_);
-        if (status != 0)
-        {
-          Jnlst().Printf(
-             J_ERROR,
-             J_LINEAR_ALGEBRA,
-             "ReSolve CUDA RF initial solve failed with status %d.\n",
-             status);
+            J_ERROR,
+            J_LINEAR_ALGEBRA,
+            "Failed to copy rhs data to ReSolve device storage.\n");
           return SYMSOLVER_FATAL_ERROR;
         }
 
-        status = resolve_FGMRES_->resetMatrix(A_);
-        if (status != 0)
+        if (method_ == resolve_glu)
         {
-          Jnlst().Printf(
-             J_ERROR,
-             J_LINEAR_ALGEBRA,
-             "Failed to reset the ReSolve CUDA FGMRES matrix "
-             "with status %d.\n",
-             status);
-          return SYMSOLVER_FATAL_ERROR;
+          status = resolve_GLU_->solve(vec_rhs_, vec_x_);
+          if (status != 0)
+          {
+            Jnlst().Printf(
+              J_ERROR,
+              J_LINEAR_ALGEBRA,
+              "ReSolve CUDA GLU solve failed with status %d.\n",
+              status);
+            return SYMSOLVER_FATAL_ERROR;
+          }
+        }
+        else if (method_ == resolve_rf)
+        {
+          status = resolve_Rf_->solve(vec_rhs_, vec_x_);
+          if (status != 0)
+          {
+            Jnlst().Printf(
+              J_ERROR,
+              J_LINEAR_ALGEBRA,
+              "ReSolve CUDA RF solve failed with status %d.\n",
+              status);
+            return SYMSOLVER_FATAL_ERROR;
+          }
+        }
+        else if (method_ == resolve_rf_fgmres)
+        {
+          status = resolve_Rf_->solve(vec_rhs_, vec_x_);
+          if (status != 0)
+          {
+            Jnlst().Printf(
+              J_ERROR,
+              J_LINEAR_ALGEBRA,
+              "ReSolve CUDA RF initial solve failed with status %d.\n",
+              status);
+            return SYMSOLVER_FATAL_ERROR;
+          }
+
+          status = resolve_FGMRES_->resetMatrix(A_);
+          if (status != 0)
+          {
+            Jnlst().Printf(
+              J_ERROR,
+              J_LINEAR_ALGEBRA,
+              "Failed to reset the ReSolve CUDA FGMRES matrix "
+              "with status %d.\n",
+              status);
+            return SYMSOLVER_FATAL_ERROR;
+          }
+
+          status = resolve_FGMRES_->solve(vec_rhs_, vec_x_);
+          if (status != 0)
+          {
+            Jnlst().Printf(
+              J_ERROR,
+              J_LINEAR_ALGEBRA,
+              "ReSolve CUDA FGMRES solve failed with status %d.\n",
+              status);
+            return SYMSOLVER_FATAL_ERROR;
+          }
         }
 
-        status = resolve_FGMRES_->solve(vec_rhs_, vec_x_);
-        if (status != 0)
+        // GPU solvers leave the current solution on the device; synchronize it
+        // to host memory before copying the solution back to Ipopt.
+        if (vec_x_->syncData(ReSolve::memory::HOST) != 0)
         {
           Jnlst().Printf(
-             J_ERROR,
-             J_LINEAR_ALGEBRA,
-             "ReSolve CUDA FGMRES solve failed with status %d.\n",
-             status);
+            J_ERROR,
+            J_LINEAR_ALGEBRA,
+            "Failed to synchronize the Resolve solution to the host.\n");
           return SYMSOLVER_FATAL_ERROR;
         }
-      }
-
-      // GPU solvers leave the current solution on the device; synchronize it
-      // to host memory before copying the solution back to Ipopt.
-      if (vec_x_->syncData(ReSolve::memory::HOST) != 0)
-      {
-        Jnlst().Printf(
-           J_ERROR,
-           J_LINEAR_ALGEBRA,
-           "Failed to synchronize the Resolve solution to the host.\n");
-        return SYMSOLVER_FATAL_ERROR;
+        if (nrhs > 1)
+        {
+          Number* solution = solution_vals.data() + irhs * ndim_;
+          if (vec_x_->copyToExternal(solution, ReSolve::memory::HOST, ReSolve::memory::HOST) != 0)
+          {
+            Jnlst().Printf(
+              J_ERROR,
+              J_LINEAR_ALGEBRA,
+              "Failed to copy the ReSolve solution to temporary storage.\n");
+            return SYMSOLVER_FATAL_ERROR;
+          }
+        }
       }
       matrix_handler_->setValuesChanged(true, ReSolve::memory::DEVICE);
     }
 # elif defined(RESOLVE_USE_HIP)
     if (method_ == resolve_rf || method_ == resolve_rf_fgmres)
     {
-      // Copy rhs_vals to vec_rhs cuda
-      if (vec_rhs_->copyFromExternal(rhs_vals, ReSolve::memory::HOST, ReSolve::memory::DEVICE) != 0)
+      for (Index irhs = 0; irhs < nrhs; ++irhs)
       {
-        Jnlst().Printf(
-           J_ERROR,
-           J_LINEAR_ALGEBRA,
-           "Failed to copy rhs data to ReSolve device storage.\n");
-        return SYMSOLVER_FATAL_ERROR;
-      }
-
-      status = resolve_Rf_->solve(vec_rhs_, vec_x_);
-      if (status != 0)
-      {
-        Jnlst().Printf(
-           J_ERROR,
-           J_LINEAR_ALGEBRA,
-           "ReSolve HIP RF solve failed with status %d.\n",
-           status);
-        return SYMSOLVER_FATAL_ERROR;
-      }
-
-      if (method_ == resolve_rf_fgmres)
-      {
-        status = resolve_FGMRES_->resetMatrix(A_);
-        if (status != 0)
+        Number* rhs = rhs_vals + irhs * ndim_;
+        // Copy the current RHS to ReSolve device storage
+        if (vec_rhs_->copyFromExternal(rhs, ReSolve::memory::HOST, ReSolve::memory::DEVICE) != 0)
         {
           Jnlst().Printf(
-             J_ERROR,
-             J_LINEAR_ALGEBRA,
-             "Failed to reset the ReSolve HIP FGMRES matrix "
-             "with status %d.\n",
-             status);
+            J_ERROR,
+            J_LINEAR_ALGEBRA,
+            "Failed to copy rhs data to ReSolve device storage.\n");
           return SYMSOLVER_FATAL_ERROR;
         }
 
-        status = resolve_FGMRES_->solve(vec_rhs_, vec_x_);
+        status = resolve_Rf_->solve(vec_rhs_, vec_x_);
         if (status != 0)
         {
           Jnlst().Printf(
-             J_ERROR,
-             J_LINEAR_ALGEBRA,
-             "ReSolve HIP FGMRES solve failed with status %d.\n",
-             status);
+            J_ERROR,
+            J_LINEAR_ALGEBRA,
+            "ReSolve HIP RF solve failed with status %d.\n",
+            status);
           return SYMSOLVER_FATAL_ERROR;
         }
-      }
 
-      // GPU solvers leave the current solution on the device; synchronize it
-      // to host memory before copying the solution back to Ipopt.
-      if (vec_x_->syncData(ReSolve::memory::HOST) != 0)
-      {
-        Jnlst().Printf(
-           J_ERROR,
-           J_LINEAR_ALGEBRA,
-           "Failed to synchronize the Resolve solution to the host.\n");
-        return SYMSOLVER_FATAL_ERROR;
+        if (method_ == resolve_rf_fgmres)
+        {
+          status = resolve_FGMRES_->resetMatrix(A_);
+          if (status != 0)
+          {
+            Jnlst().Printf(
+              J_ERROR,
+              J_LINEAR_ALGEBRA,
+              "Failed to reset the ReSolve HIP FGMRES matrix "
+              "with status %d.\n",
+              status);
+            return SYMSOLVER_FATAL_ERROR;
+          }
+
+          status = resolve_FGMRES_->solve(vec_rhs_, vec_x_);
+          if (status != 0)
+          {
+            Jnlst().Printf(
+              J_ERROR,
+              J_LINEAR_ALGEBRA,
+              "ReSolve HIP FGMRES solve failed with status %d.\n",
+              status);
+            return SYMSOLVER_FATAL_ERROR;
+          }
+        }
+
+        // GPU solvers leave the current solution on the device; synchronize it
+        // to host memory before copying the solution back to Ipopt.
+        if (vec_x_->syncData(ReSolve::memory::HOST) != 0)
+        {
+          Jnlst().Printf(
+            J_ERROR,
+            J_LINEAR_ALGEBRA,
+            "Failed to synchronize the Resolve solution to the host.\n");
+          return SYMSOLVER_FATAL_ERROR;
+        }
+        if (nrhs > 1)
+        {
+          Number* solution = solution_vals.data() + irhs * ndim_;
+
+          if (vec_x_->copyToExternal(
+                solution,
+                ReSolve::memory::HOST,
+                ReSolve::memory::HOST) != 0)
+          {
+            Jnlst().Printf(
+              J_ERROR,
+              J_LINEAR_ALGEBRA,
+              "Failed to copy the ReSolve solution to temporary storage.\n");
+            return SYMSOLVER_FATAL_ERROR;
+          }
+        }
       }
     }
 #endif
@@ -928,36 +995,65 @@ ESymSolverStatus ReSolveSolverInterface::MultiSolve(bool new_matrix, const Index
         }
       }
 
-      // Copy rhs_vals to vec_rhs cuda
-      if (vec_rhs_->copyFromExternal(rhs_vals, ReSolve::memory::HOST, ReSolve::memory::HOST) != 0)
+      for (Index irhs = 0; irhs < nrhs; ++irhs)
       {
-        Jnlst().Printf(
-           J_ERROR,
-           J_LINEAR_ALGEBRA,
-           "Failed to copy rhs data to ReSolve host storage.\n");
-        return SYMSOLVER_FATAL_ERROR;
-      }
-      int status = resolve_KLU_->solve(vec_rhs_, vec_x_);
-      if (status != 0)
-      {
-        Jnlst().Printf(
-          J_ERROR,
-          J_LINEAR_ALGEBRA,
-          "ReSolve KLU solve failed with status %d.\n",
-          status);
-        return SYMSOLVER_FATAL_ERROR;
+        Number* rhs = rhs_vals + irhs * ndim_;
+        // Copy the current RHS to ReSolve host storage
+        if (vec_rhs_->copyFromExternal(rhs, ReSolve::memory::HOST, ReSolve::memory::HOST) != 0)
+        {
+          Jnlst().Printf(
+            J_ERROR,
+            J_LINEAR_ALGEBRA,
+            "Failed to copy rhs data to ReSolve host storage.\n");
+          return SYMSOLVER_FATAL_ERROR;
+        }
+        status = resolve_KLU_->solve(vec_rhs_, vec_x_);
+        if (status != 0)
+        {
+          Jnlst().Printf(
+            J_ERROR,
+            J_LINEAR_ALGEBRA,
+            "ReSolve KLU solve failed with status %d.\n",
+            status);
+          return SYMSOLVER_FATAL_ERROR;
+        }
+        if (nrhs > 1)
+        {
+          Number* solution = solution_vals.data() + irhs * ndim_;
+
+          if (vec_x_->copyToExternal(
+                solution,
+                ReSolve::memory::HOST,
+                ReSolve::memory::HOST) != 0)
+          {
+            Jnlst().Printf(
+              J_ERROR,
+              J_LINEAR_ALGEBRA,
+              "Failed to copy the ReSolve solution to temporary storage.\n");
+            return SYMSOLVER_FATAL_ERROR;
+          }
+        }
       }
     }
   }
 
-  // copy vec_x to rhs_vals
-  if (vec_x_->copyToExternal(rhs_vals, ReSolve::memory::HOST, ReSolve::memory::HOST) != 0)
+  if (nrhs == 1)
   {
-    Jnlst().Printf(
-       J_ERROR,
-       J_LINEAR_ALGEBRA,
-       "Failed to copy the Resolve solution to Ipopt.\n");
-    return SYMSOLVER_FATAL_ERROR;
+    if (vec_x_->copyToExternal(rhs_vals, ReSolve::memory::HOST, ReSolve::memory::HOST) != 0)
+    {
+      Jnlst().Printf(
+        J_ERROR,
+        J_LINEAR_ALGEBRA,
+        "Failed to copy the Resolve solution to Ipopt.\n");
+      return SYMSOLVER_FATAL_ERROR;
+    }
+  }
+  else
+  {
+    std::copy(
+      solution_vals.begin(),
+      solution_vals.end(),
+      rhs_vals);
   }
 
   if (HaveIpData())
