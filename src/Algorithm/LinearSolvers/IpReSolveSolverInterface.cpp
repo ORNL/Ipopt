@@ -518,13 +518,26 @@ ESymSolverStatus ReSolveSolverInterface::MultiSolve(bool new_matrix, const Index
 
         ReSolve::matrix::Sparse* L = resolve_KLU_->getLFactor();
         ReSolve::matrix::Sparse* U = resolve_KLU_->getUFactor();
-        if (L == nullptr)
-        {
-          printf("ERROR");
-        }
         ReSolve::index_type* P = resolve_KLU_->getPOrdering();
         ReSolve::index_type* Q = resolve_KLU_->getQOrdering();
-        resolve_GLU_->setup(A_, L, U, P, Q);
+        if (L == nullptr || U == nullptr || P == nullptr || Q == nullptr)
+        {
+          Jnlst().Printf(
+              J_ERROR,
+              J_LINEAR_ALGEBRA,
+              "Failed to obtain KLU factors or permutations for ReSolve CUDA GLU setup.\n");
+          return SYMSOLVER_FATAL_ERROR;
+        }
+        status = resolve_GLU_->setup(A_, L, U, P, Q);
+        if (status != 0)
+        {
+          Jnlst().Printf(
+              J_ERROR,
+              J_LINEAR_ALGEBRA,
+              "ReSolve CUDA GLU setup failed with status %d.\n",
+              status);
+          return SYMSOLVER_FATAL_ERROR;
+        }
       }
 #endif
     }
