@@ -288,7 +288,7 @@ ESymSolverStatus ReSolveSolverInterface::InitializeStructure(Index dim, Index no
   {
     A_ = new ReSolve::matrix::Csr(dim, dim, nonzeros);
     delete[] val_;
-    val_ = new Number[nonzeros];
+    val_ = new Number[static_cast<std::size_t>(nonzeros)];
 
     // ReSolve borrows the matrix storage and does not take ownership.
     // Ipopt owns ia/ja, while this interface owns val_.
@@ -370,12 +370,13 @@ ESymSolverStatus ReSolveSolverInterface::MultiSolve(bool new_matrix, const Index
   }
 
   int status;
-  int status_refactor = 0;
 
   bool full_factor_done = false;
 
   (void)ia;
   (void)ja;
+  (void)check_NegEVals;
+  (void)numberOfNegEVals;
 
   // Ipopt updates val_ directly, so mark the host matrix current before
   // synchronizing updated values to the GPU.
@@ -519,7 +520,7 @@ ESymSolverStatus ReSolveSolverInterface::MultiSolve(bool new_matrix, const Index
     }
     else if (method_ == resolve_rf || method_ == resolve_rf_fgmres)
     {
-      status_refactor = resolve_Rf_->refactorize();
+      int status_refactor = resolve_Rf_->refactorize();
       if (status_refactor != 0)
       {
         Jnlst().Printf(
