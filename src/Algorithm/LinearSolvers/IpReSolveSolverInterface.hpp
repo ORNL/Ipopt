@@ -9,7 +9,6 @@
 
 #include <fstream>
 #include <iomanip>
-#include <iostream>
 
 #include "IpoptConfig.h"
 #include <resolve/resolve_defs.hpp>
@@ -151,8 +150,6 @@ private:
 
   Number rcond_val_;
   bool use_rcond_;
-
-  int factor_by_t_;
 
   ReSolve::LinSolverDirectKLU* resolve_KLU_;
   ReSolve::LinAlgWorkspaceCpu* workspace_CPU_;

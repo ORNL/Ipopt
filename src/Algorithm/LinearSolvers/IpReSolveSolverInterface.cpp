@@ -9,7 +9,6 @@
 
 #include <algorithm>
 #include <cmath>
-#include <iostream>
 #include <type_traits>
 #include <vector>
 
@@ -44,7 +43,6 @@ ReSolveSolverInterface::ReSolveSolverInterface()
     halt_if_singular_(false),
     rcond_val_(1e-128),
     use_rcond_(false),
-    factor_by_t_(2),
     resolve_KLU_(NULL),
     workspace_CPU_(NULL),
     A_(NULL),
@@ -64,16 +62,6 @@ ReSolveSolverInterface::ReSolveSolverInterface()
     vector_handler_(NULL)
 {
   DBG_START_METH("ReSolveSolverInterface::ReSolveSolverInterface()", dbg_verbosity);
-#ifdef RESOLVE_USE_GPU
-  printf("Resolve with GPU.\n");
-# ifdef RESOLVE_USE_CUDA
-  printf("Resolve with CUDA.\n");
-# else
-  printf("Resolve with HIP.\n");
-# endif
-#else
-  printf("Resolve with CPU. CUDA or HIP Unavailable.\n");
-#endif
 }
 
 ReSolveSolverInterface::~ReSolveSolverInterface()
@@ -174,9 +162,6 @@ void ReSolveSolverInterface::RegisterOptions(SmartPtr<RegisteredOptions> roption
 
 bool ReSolveSolverInterface::InitializeImpl(const OptionsList& options, const std::string& prefix)
 {
-
-  // printf("ReSolveSolverInterface::InitializeImpl is Called\n");
-
   options.GetNumericValue("resolve_tol", pivot_tol_, prefix);
 
   options.GetIntegerValue("resolve_ordering", ordering_, prefix);
@@ -229,7 +214,6 @@ ESymSolverStatus ReSolveSolverInterface::InitializeStructure(Index dim, Index no
   DBG_START_METH("ReSolveSolverInterface::InitializeStructure", dbg_verbosity);
 
   ESymSolverStatus retval = SYMSOLVER_SUCCESS;
-  printf("ReSolveSolverInterface::InitializeStructure Called: dim: %d, nonzeros %d\n", dim, nonzeros);
 
   if (!initialized_resolve_)
   {
@@ -240,7 +224,6 @@ ESymSolverStatus ReSolveSolverInterface::InitializeStructure(Index dim, Index no
 
     if (method_ == resolve_klu)
     {
-      printf("Resolve::KLU Setup\n");
       workspace_CPU_ = new ReSolve::LinAlgWorkspaceCpu();
       matrix_handler_ = new ReSolve::MatrixHandler(workspace_CPU_);
       vector_handler_ = new ReSolve::VectorHandler(workspace_CPU_);
@@ -249,8 +232,6 @@ ESymSolverStatus ReSolveSolverInterface::InitializeStructure(Index dim, Index no
 #ifdef RESOLVE_USE_GPU
     else
     {
-      printf("Resolve::GPU Setup\n");
-
       workspace_GPU_ = new workspace_type();
       workspace_GPU_->initializeHandles();
 
@@ -259,13 +240,11 @@ ESymSolverStatus ReSolveSolverInterface::InitializeStructure(Index dim, Index no
 
       if (method_ == resolve_rf || method_ == resolve_rf_fgmres)
       {
-        printf("Resolve::RF Setup\n");
         resolve_Rf_ = new rf_solver(workspace_GPU_);
       }
 # ifdef RESOLVE_USE_CUDA
       else if (method_ == resolve_glu)
       {
-        printf("Resolve::GLU Setup\n");
         resolve_GLU_ =
           new ReSolve::LinSolverDirectCuSolverGLU(workspace_GPU_);
       }
@@ -273,8 +252,6 @@ ESymSolverStatus ReSolveSolverInterface::InitializeStructure(Index dim, Index no
 
       if (method_ == resolve_rf_fgmres)
       {
-        printf("Resolve::FGMRES Setup\n");
-
         GS_ = new ReSolve::GramSchmidt(
           vector_handler_,
           ReSolve::GramSchmidt::CGS2);
@@ -306,7 +283,6 @@ ESymSolverStatus ReSolveSolverInterface::InitializeStructure(Index dim, Index no
   // Store size for later use
   ndim_ = dim;
   nonzeros_ = nonzeros;
-  printf("Using Refactorization after %d iterations\n\n", k_);
 
   if (!initialized_)
   {
@@ -428,17 +404,7 @@ ESymSolverStatus ReSolveSolverInterface::MultiSolve(bool new_matrix, const Index
 #endif
   }
 
-  // FACTORIZE
-
-  // Every factor_by_t_ iteration do a Factorization!!!
-  if (n_iteration_ % factor_by_t_ == 0)
-  {
-    // factorize_ = true;
-    // re_factorize_ = true;
-  }
-
   if( n_iteration_ == 0){
-    printf("First Iteration: %d: Performing KLU Factorization\n", n_iteration_);
     // Symbolic Factorization
     if (HaveIpData())
     {
@@ -447,8 +413,11 @@ ESymSolverStatus ReSolveSolverInterface::MultiSolve(bool new_matrix, const Index
     status = resolve_KLU_->analyze();
     if (status != 0)
     {
-      printf("Symbolic_ factorization crashed with Common_.status = %d \n", status);
-      printf("%s:0 Singular\n", __func__);
+      Jnlst().Printf(
+        J_ERROR,
+        J_LINEAR_ALGEBRA,
+        "ReSolve KLU symbolic analysis failed with status %d.\n",
+        status);
       return SYMSOLVER_SINGULAR;
     }
     if (HaveIpData())
@@ -459,8 +428,6 @@ ESymSolverStatus ReSolveSolverInterface::MultiSolve(bool new_matrix, const Index
 
   if (factorize_ && (new_matrix || re_factorize_))
   {
-    // printf("Iteration: %d: Performing KLU Factorization\n", n_iteration_);
-
     //  perform the factorization
     if (HaveIpData())
     {
@@ -468,17 +435,18 @@ ESymSolverStatus ReSolveSolverInterface::MultiSolve(bool new_matrix, const Index
     }
 
     // First Factorization is always done by KLU
-    // std::cout << "%" << n_iteration_ << "%" << "KLU FULL FACTORIZATION" << std::endl;
     status = resolve_KLU_->factorize();
     full_factor_done = true;
 
     if (status != 0)
     {
-      DBG_PRINT((1, "FACTORIZATION FAILED!\n"));
-      printf("%s: Singular\n", __func__);
+      Jnlst().Printf(
+        J_ERROR,
+        J_LINEAR_ALGEBRA,
+        "ReSolve KLU factorization failed with status %d.\n",
+        status);
       return SYMSOLVER_SINGULAR; // Matrix singular or error occurred
     }
-    // printf("Iteration: %d: Done KLU Factorization\n", n_iteration_);
 
     // GLU can be setup as early as possible
     if (n_iteration_ == k_ - 1)
@@ -486,8 +454,6 @@ ESymSolverStatus ReSolveSolverInterface::MultiSolve(bool new_matrix, const Index
 #ifdef RESOLVE_USE_CUDA
       if (method_ == resolve_glu)
       {
-        printf("Iteration: %d: Setting Up GLU\n", n_iteration_);
-
         ReSolve::matrix::Sparse* L = resolve_KLU_->getLFactor();
         ReSolve::matrix::Sparse* U = resolve_KLU_->getUFactor();
         ReSolve::index_type* P = resolve_KLU_->getPOrdering();
@@ -523,7 +489,6 @@ ESymSolverStatus ReSolveSolverInterface::MultiSolve(bool new_matrix, const Index
     // Stop doing factorization after iteration _k
     factorize_ = (n_iteration_ >= (k_ - 1)) ? false : true;
     re_factorize_ = false;
-    // printf("Iteration: %d: Ending Factorization Section\n", n_iteration_);
   }
 
   // REFACTORIZE
@@ -541,7 +506,6 @@ ESymSolverStatus ReSolveSolverInterface::MultiSolve(bool new_matrix, const Index
     // Actual Refactorize
     if (method_ == resolve_glu)
     {
-      //std::cout << "%" << n_iteration_ << "%" << "GLU->refactorize()" << std::endl;
       status = resolve_GLU_->refactorize();
       if (status != 0)
       {
@@ -584,7 +548,6 @@ ESymSolverStatus ReSolveSolverInterface::MultiSolve(bool new_matrix, const Index
 
     if (method_ == resolve_klu)
     {
-      //std::cout << "%" << n_iteration_ << "%" << "KLU->refactorize()" << std::endl;
       status = resolve_KLU_->refactorize();
       if (status != 0)
       {
@@ -617,12 +580,14 @@ ESymSolverStatus ReSolveSolverInterface::MultiSolve(bool new_matrix, const Index
       if (use_rcond_)
       {
         Number rcond_val = resolve_KLU_->getMatrixConditionNumber();
-        //printf("RCond: %12.8e\n", rcond_val);
         if (rcond_val < rcond_val_)
         {
           if (full_factor_done)
           {
-            printf("%s:1 Singular\n", __func__);
+            Jnlst().Printf(
+              J_DETAILED,
+              J_LINEAR_ALGEBRA,
+              "ReSolve KLU reciprocal condition estimate is below the configured threshold.\n");
             return SYMSOLVER_SINGULAR;
           }
           else
@@ -631,8 +596,11 @@ ESymSolverStatus ReSolveSolverInterface::MultiSolve(bool new_matrix, const Index
             // and do full factorization
             factorize_ = true;
             re_factorize_ = true;
-            printf("%s:1 Need to do full factorization again.\n", __func__);
-            DBG_PRINT((1, "Ask caller to call again.\n"))
+            Jnlst().Printf(
+              J_DETAILED,
+              J_LINEAR_ALGEBRA,
+              "ReSolve KLU reciprocal condition estimate is below the configured threshold; "
+              "requesting a full factorization.\n");
             return SYMSOLVER_CALL_AGAIN;
           }
         }
@@ -681,8 +649,6 @@ ESymSolverStatus ReSolveSolverInterface::MultiSolve(bool new_matrix, const Index
 # ifdef RESOLVE_USE_CUDA
       if (method_ == resolve_rf || method_ == resolve_rf_fgmres)
       {
-        printf("CUDA: Iteration: %d: Setting up %s\n", n_iteration_, method_.c_str());
-
         ReSolve::matrix::Sparse* L = resolve_KLU_->getLFactor();
         ReSolve::matrix::Sparse* U = resolve_KLU_->getUFactor();
         ReSolve::index_type* P = resolve_KLU_->getPOrdering();
@@ -720,7 +686,6 @@ ESymSolverStatus ReSolveSolverInterface::MultiSolve(bool new_matrix, const Index
 # elif defined(RESOLVE_USE_HIP)
       if (method_ == resolve_rf || method_ == resolve_rf_fgmres)
       {
-        printf("HIP: Iteration: %d: Setting up %s\n", n_iteration_, method_.c_str());
         ReSolve::matrix::Sparse* L = resolve_KLU_->getLFactor();
         ReSolve::matrix::Sparse* U = resolve_KLU_->getUFactor();
         ReSolve::index_type* P = resolve_KLU_->getPOrdering();
@@ -859,7 +824,7 @@ ESymSolverStatus ReSolveSolverInterface::MultiSolve(bool new_matrix, const Index
           Jnlst().Printf(
             J_ERROR,
             J_LINEAR_ALGEBRA,
-            "Failed to synchronize the Resolve solution to the host.\n");
+            "Failed to synchronize the ReSolve solution to the host.\n");
           return SYMSOLVER_FATAL_ERROR;
         }
         if (nrhs > 1)
@@ -937,7 +902,7 @@ ESymSolverStatus ReSolveSolverInterface::MultiSolve(bool new_matrix, const Index
           Jnlst().Printf(
             J_ERROR,
             J_LINEAR_ALGEBRA,
-            "Failed to synchronize the Resolve solution to the host.\n");
+            "Failed to synchronize the ReSolve solution to the host.\n");
           return SYMSOLVER_FATAL_ERROR;
         }
         if (nrhs > 1)
@@ -966,12 +931,14 @@ ESymSolverStatus ReSolveSolverInterface::MultiSolve(bool new_matrix, const Index
       if (use_rcond_)
       {
         Number rcond_val = resolve_KLU_->getMatrixConditionNumber();
-        //printf("RCond: %12.8e\n", rcond_val);
         if (rcond_val < rcond_val_)
         {
           if (full_factor_done)
           {
-            printf("%s:2 Singular\n", __func__);
+            Jnlst().Printf(
+              J_DETAILED,
+              J_LINEAR_ALGEBRA,
+              "ReSolve KLU reciprocal condition estimate is below the configured threshold.\n");
             return SYMSOLVER_SINGULAR;
           }
           else
@@ -980,8 +947,11 @@ ESymSolverStatus ReSolveSolverInterface::MultiSolve(bool new_matrix, const Index
             // and do full factorization
             factorize_ = true;
             re_factorize_ = true;
-            printf("Need to do full factorization again.\n");
-            DBG_PRINT((1, "Ask caller to call again.\n"))
+            Jnlst().Printf(
+              J_DETAILED,
+              J_LINEAR_ALGEBRA,
+              "ReSolve KLU reciprocal condition estimate is below the configured threshold; "
+              "requesting a full factorization.\n");
             return SYMSOLVER_CALL_AGAIN;
           }
         }
