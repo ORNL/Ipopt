@@ -214,7 +214,7 @@ if COIN_HAS_KLU
   libipopt_la_SOURCES += Algorithm/LinearSolvers/IpKLUSolverInterface.cpp
 endif
 
-if COIN_HAS_KLU
+if COIN_HAS_RESOLVE
   libipopt_la_SOURCES += Algorithm/LinearSolvers/IpReSolveSolverInterface.cpp
 endif
 
