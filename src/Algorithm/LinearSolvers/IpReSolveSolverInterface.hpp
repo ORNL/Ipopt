@@ -139,7 +139,6 @@ private:
   Index ndim_;          ///< Number of dimensions
   Number* val_;         ///< Storage for variables
   Index numneg_;        ///< Number of negative pivots in last factorization
-  bool pivtol_changed_; ///< indicates if pivtol has been changed
   bool re_factorize_;
   bool factorize_;
   std::string method_;

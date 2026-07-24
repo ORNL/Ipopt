@@ -34,7 +34,6 @@ ReSolveSolverInterface::ReSolveSolverInterface()
     ndim_(0),
     val_(NULL),
     numneg_(0),
-    pivtol_changed_(false),
     re_factorize_(false),
     factorize_(false),
     method_(resolve_klu),
@@ -154,10 +153,12 @@ void ReSolveSolverInterface::RegisterOptions(SmartPtr<RegisteredOptions> roption
                           false,                             // Default is False in ReSolve
                           "FALSE: keep going, TRUE: stop quickly.", false);
 
-  roptions->AddIntegerOption("resolve_n_skip_refactoring",                      //
+  roptions->AddLowerBoundedIntegerOption("resolve_n_skip_refactoring",          //
                              "How many iterations to skip refactoring",         //
                              1,                                                 //
-                             "Number of initial KLU iterations before switching to the selected refactorization method. Must be at least 1.", //
+                             1,                                                 //
+                             "Number of initial KLU iterations before switching to the selected refactorization method. " //
+                             "At least one KLU iteration is required to construct the factors and permutations used during setup.", //
                              false);
 
   roptions->AddBoolOption("resolve_use_rcond", //
@@ -185,15 +186,6 @@ bool ReSolveSolverInterface::InitializeImpl(const OptionsList& options, const st
 
   // ReSolve's GPU refactorization methods require an initial KLU solve
   // to construct the factors and permutations used during setup.
-  if (n_skip_refactoring < 1)
-  {
-    Jnlst().Printf(
-      J_ERROR,
-      J_LINEAR_ALGEBRA,
-      "resolve_n_skip_refactoring must be at least 1.\n");
-    return false;
-  }
-
   k_ = n_skip_refactoring;
 
   options.GetBoolValue("resolve_halt_if_singular", halt_if_singular_, prefix);
@@ -385,7 +377,6 @@ ESymSolverStatus ReSolveSolverInterface::InitializeStructure(Index dim, Index no
   n_iteration_ = 0;
 
   initialized_ = true;
-  pivtol_changed_ = false;
 
   return retval;
 }
@@ -533,21 +524,6 @@ ESymSolverStatus ReSolveSolverInterface::MultiSolve(bool new_matrix, const Index
     factorize_ = (n_iteration_ >= (k_ - 1)) ? false : true;
     re_factorize_ = false;
     // printf("Iteration: %d: Ending Factorization Section\n", n_iteration_);
-  }
-
-  if (pivtol_changed_)
-  {
-    DBG_PRINT((1, "Pivot tolerance has changed.\n"));
-    pivtol_changed_ = false;
-    // If the pivot tolerance has been changed but the matrix is not
-    // new, we have to request the values for the matrix again to do
-    // the factorization again.
-    if (!new_matrix)
-    {
-      DBG_PRINT((1, "Ask caller to call again.\n"));
-      factorize_ = true;
-      return SYMSOLVER_CALL_AGAIN;
-    }
   }
 
   // REFACTORIZE
@@ -1097,7 +1073,8 @@ Index ReSolveSolverInterface::NumberOfNegEVals() const
 
 bool ReSolveSolverInterface::IncreaseQuality()
 {
-  return true;
+  // Dynamic quality increases are not currently supported by this interface.
+  return false;
 }
 
 } // namespace Ipopt
