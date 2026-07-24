@@ -673,6 +673,17 @@ ESymSolverStatus ReSolveSolverInterface::MultiSolve(bool new_matrix, const Index
              status);
           return SYMSOLVER_FATAL_ERROR;
         }
+
+        status = resolve_Rf_->refactorize();
+        if (status != 0)
+        {
+          Jnlst().Printf(
+             J_ERROR,
+             J_LINEAR_ALGEBRA,
+             "ReSolve CUDA RF initial refactorization failed with status %d.\n",
+             status);
+          return SYMSOLVER_FATAL_ERROR;
+        }
       }
 
       if (method_ == resolve_rf_fgmres && resolve_FGMRES_->setup(A_) != 0)
@@ -719,6 +730,17 @@ ESymSolverStatus ReSolveSolverInterface::MultiSolve(bool new_matrix, const Index
              J_ERROR,
              J_LINEAR_ALGEBRA,
              "ReSolve HIP RF setup failed with status %d.\n",
+             status);
+          return SYMSOLVER_FATAL_ERROR;
+        }
+
+        status = resolve_Rf_->refactorize();
+        if (status != 0)
+        {
+          Jnlst().Printf(
+             J_ERROR,
+             J_LINEAR_ALGEBRA,
+             "ReSolve HIP RF initial refactorization failed with status %d.\n",
              status);
           return SYMSOLVER_FATAL_ERROR;
         }
