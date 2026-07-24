@@ -100,9 +100,10 @@ build_triplet = @build@
 host_triplet = @host@
 noinst_PROGRAMS = hs071_cpp$(EXEEXT) hs071_c$(EXEEXT) \
 	emptynlp$(EXEEXT) getcurr$(EXEEXT) $(am__EXEEXT_1) \
-	$(am__EXEEXT_2)
-@COIN_HAS_F77_TRUE@am__append_1 = hs071_f
-@BUILD_SIPOPT_TRUE@am__append_2 = parametric_cpp redhess_cpp
+	$(am__EXEEXT_2) $(am__EXEEXT_3)
+@COIN_HAS_RESOLVE_TRUE@am__append_1 = resolve_multirhs
+@COIN_HAS_F77_TRUE@am__append_2 = hs071_f
+@BUILD_SIPOPT_TRUE@am__append_3 = parametric_cpp redhess_cpp
 subdir = test
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
 am__aclocal_m4_deps = $(top_srcdir)/configure.ac
@@ -116,8 +117,9 @@ CONFIG_CLEAN_FILES = run_unitTests hs071_main.cpp hs071_nlp.cpp \
 	hs071_nlp.hpp hs071_c.c parametric_driver.cpp \
 	parametricTNLP.cpp MySensTNLP.cpp redhess_cpp.cpp
 CONFIG_CLEAN_VPATH_FILES =
-@COIN_HAS_F77_TRUE@am__EXEEXT_1 = hs071_f$(EXEEXT)
-@BUILD_SIPOPT_TRUE@am__EXEEXT_2 = parametric_cpp$(EXEEXT) \
+@COIN_HAS_RESOLVE_TRUE@am__EXEEXT_1 = resolve_multirhs$(EXEEXT)
+@COIN_HAS_F77_TRUE@am__EXEEXT_2 = hs071_f$(EXEEXT)
+@BUILD_SIPOPT_TRUE@am__EXEEXT_3 = parametric_cpp$(EXEEXT) \
 @BUILD_SIPOPT_TRUE@	redhess_cpp$(EXEEXT)
 PROGRAMS = $(noinst_PROGRAMS)
 nodist_emptynlp_OBJECTS = emptynlp.$(OBJEXT)
@@ -149,6 +151,10 @@ nodist_redhess_cpp_OBJECTS = MySensTNLP.$(OBJEXT) \
 	redhess_cpp.$(OBJEXT)
 redhess_cpp_OBJECTS = $(nodist_redhess_cpp_OBJECTS)
 redhess_cpp_DEPENDENCIES = ../contrib/sIPOPT/src/libsipopt.la
+@COIN_HAS_RESOLVE_TRUE@am_resolve_multirhs_OBJECTS = resolve_multirhs-resolve_multirhs.$(OBJEXT)
+resolve_multirhs_OBJECTS = $(am_resolve_multirhs_OBJECTS)
+@COIN_HAS_RESOLVE_TRUE@resolve_multirhs_DEPENDENCIES =  \
+@COIN_HAS_RESOLVE_TRUE@	../src/libipopt.la
 AM_V_P = $(am__v_P_@AM_V@)
 am__v_P_ = $(am__v_P_@AM_DEFAULT_V@)
 am__v_P_0 = false
@@ -168,7 +174,8 @@ am__depfiles_remade = ./$(DEPDIR)/MySensTNLP.Po \
 	./$(DEPDIR)/emptynlp.Po ./$(DEPDIR)/getcurr.Po \
 	./$(DEPDIR)/hs071_c.Po ./$(DEPDIR)/hs071_main.Po \
 	./$(DEPDIR)/hs071_nlp.Po ./$(DEPDIR)/parametricTNLP.Po \
-	./$(DEPDIR)/parametric_driver.Po ./$(DEPDIR)/redhess_cpp.Po
+	./$(DEPDIR)/parametric_driver.Po ./$(DEPDIR)/redhess_cpp.Po \
+	./$(DEPDIR)/resolve_multirhs-resolve_multirhs.Po
 am__mv = mv -f
 COMPILE = $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) \
 	$(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS)
@@ -224,7 +231,7 @@ am__v_F77LD_1 =
 SOURCES = $(nodist_emptynlp_SOURCES) $(nodist_getcurr_SOURCES) \
 	$(nodist_hs071_c_SOURCES) $(nodist_hs071_cpp_SOURCES) \
 	$(nodist_hs071_f_SOURCES) $(nodist_parametric_cpp_SOURCES) \
-	$(nodist_redhess_cpp_SOURCES)
+	$(nodist_redhess_cpp_SOURCES) $(resolve_multirhs_SOURCES)
 am__can_run_installinfo = \
   case $$AM_UPDATE_INFO_DIR in \
     n|no|NO) false;; \
@@ -430,6 +437,9 @@ nodist_emptynlp_SOURCES = emptynlp.cpp
 emptynlp_LDADD = ../src/libipopt.la
 nodist_getcurr_SOURCES = getcurr.cpp
 getcurr_LDADD = ../src/libipopt.la
+@COIN_HAS_RESOLVE_TRUE@resolve_multirhs_SOURCES = resolve_multirhs.cpp
+@COIN_HAS_RESOLVE_TRUE@resolve_multirhs_CPPFLAGS = $(AM_CPPFLAGS) $(IPOPTLIB_CFLAGS_NOPC)
+@COIN_HAS_RESOLVE_TRUE@resolve_multirhs_LDADD = ../src/libipopt.la
 @IPOPT_SINGLE_FALSE@nodist_hs071_f_SOURCES = hs071_f.f
 @IPOPT_SINGLE_TRUE@nodist_hs071_f_SOURCES = hs071_fs.f
 hs071_f_LDADD = ../src/libipopt.la $(CXXLIBS)
@@ -447,6 +457,7 @@ AM_CPPFLAGS = \
   -I$(srcdir)/../src/LinAlg \
   -I$(srcdir)/../src/LinAlg/TMatrices \
   -I$(srcdir)/../src/Algorithm \
+  -I$(srcdir)/../src/Algorithm/LinearSolvers \
   -I$(srcdir)/../src/Interfaces \
   -I$(srcdir)/../contrib/sIPOPT/src \
   -I$(srcdir)/../contrib/sIPOPT/examples/parametric_cpp \
@@ -526,6 +537,10 @@ redhess_cpp$(EXEEXT): $(redhess_cpp_OBJECTS) $(redhess_cpp_DEPENDENCIES) $(EXTRA
 	@rm -f redhess_cpp$(EXEEXT)
 	$(AM_V_CXXLD)$(CXXLINK) $(redhess_cpp_OBJECTS) $(redhess_cpp_LDADD) $(LIBS)
 
+resolve_multirhs$(EXEEXT): $(resolve_multirhs_OBJECTS) $(resolve_multirhs_DEPENDENCIES) $(EXTRA_resolve_multirhs_DEPENDENCIES)
+	@rm -f resolve_multirhs$(EXEEXT)
+	$(AM_V_CXXLD)$(CXXLINK) $(resolve_multirhs_OBJECTS) $(resolve_multirhs_LDADD) $(LIBS)
+
 mostlyclean-compile:
 	-rm -f *.$(OBJEXT)
 
@@ -541,6 +556,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/parametricTNLP.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/parametric_driver.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/redhess_cpp.Po@am__quote@ # am--include-marker
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/resolve_multirhs-resolve_multirhs.Po@am__quote@ # am--include-marker
 
 $(am__depfiles_remade):
 	@$(MKDIR_P) $(@D)
@@ -595,6 +611,20 @@ am--depfiles: $(am__depfiles_remade)
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='$<' object='$@' libtool=yes @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(LTCXXCOMPILE) -c -o $@ $<
+
+resolve_multirhs-resolve_multirhs.o: resolve_multirhs.cpp
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(resolve_multirhs_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT resolve_multirhs-resolve_multirhs.o -MD -MP -MF $(DEPDIR)/resolve_multirhs-resolve_multirhs.Tpo -c -o resolve_multirhs-resolve_multirhs.o `test -f 'resolve_multirhs.cpp' || echo '$(srcdir)/'`resolve_multirhs.cpp
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/resolve_multirhs-resolve_multirhs.Tpo $(DEPDIR)/resolve_multirhs-resolve_multirhs.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='resolve_multirhs.cpp' object='resolve_multirhs-resolve_multirhs.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(resolve_multirhs_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o resolve_multirhs-resolve_multirhs.o `test -f 'resolve_multirhs.cpp' || echo '$(srcdir)/'`resolve_multirhs.cpp
+
+resolve_multirhs-resolve_multirhs.obj: resolve_multirhs.cpp
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(resolve_multirhs_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT resolve_multirhs-resolve_multirhs.obj -MD -MP -MF $(DEPDIR)/resolve_multirhs-resolve_multirhs.Tpo -c -o resolve_multirhs-resolve_multirhs.obj `if test -f 'resolve_multirhs.cpp'; then $(CYGPATH_W) 'resolve_multirhs.cpp'; else $(CYGPATH_W) '$(srcdir)/resolve_multirhs.cpp'; fi`
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/resolve_multirhs-resolve_multirhs.Tpo $(DEPDIR)/resolve_multirhs-resolve_multirhs.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='resolve_multirhs.cpp' object='resolve_multirhs-resolve_multirhs.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(resolve_multirhs_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o resolve_multirhs-resolve_multirhs.obj `if test -f 'resolve_multirhs.cpp'; then $(CYGPATH_W) 'resolve_multirhs.cpp'; else $(CYGPATH_W) '$(srcdir)/resolve_multirhs.cpp'; fi`
 
 .f.o:
 	$(AM_V_F77)$(F77COMPILE) -c -o $@ $<
@@ -713,6 +743,7 @@ distclean: distclean-am
 	-rm -f ./$(DEPDIR)/parametricTNLP.Po
 	-rm -f ./$(DEPDIR)/parametric_driver.Po
 	-rm -f ./$(DEPDIR)/redhess_cpp.Po
+	-rm -f ./$(DEPDIR)/resolve_multirhs-resolve_multirhs.Po
 	-rm -f Makefile
 distclean-am: clean-am distclean-compile distclean-generic \
 	distclean-tags
@@ -767,6 +798,7 @@ maintainer-clean: maintainer-clean-am
 	-rm -f ./$(DEPDIR)/parametricTNLP.Po
 	-rm -f ./$(DEPDIR)/parametric_driver.Po
 	-rm -f ./$(DEPDIR)/redhess_cpp.Po
+	-rm -f ./$(DEPDIR)/resolve_multirhs-resolve_multirhs.Po
 	-rm -f Makefile
 maintainer-clean-am: distclean-am maintainer-clean-generic
 
@@ -816,6 +848,8 @@ hs071_f.f hs071_fs.f:
 @BUILD_JAVA_FALSE@test: $(noinst_PROGRAMS)
 	chmod u+x ./run_unitTests
 	./run_unitTests
+
+@COIN_HAS_RESOLVE_TRUE@	./resolve_multirhs
 
 unitTest: test
 

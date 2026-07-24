@@ -10,6 +10,10 @@
 
 noinst_PROGRAMS = hs071_cpp hs071_c emptynlp getcurr
 
+if COIN_HAS_RESOLVE
+noinst_PROGRAMS += resolve_multirhs
+endif
+
 if COIN_HAS_F77
 noinst_PROGRAMS += hs071_f
 endif
@@ -29,6 +33,12 @@ emptynlp_LDADD = ../src/libipopt.la
 
 nodist_getcurr_SOURCES = getcurr.cpp
 getcurr_LDADD = ../src/libipopt.la
+
+if COIN_HAS_RESOLVE
+resolve_multirhs_SOURCES = resolve_multirhs.cpp
+resolve_multirhs_CPPFLAGS = $(AM_CPPFLAGS) $(IPOPTLIB_CFLAGS_NOPC)
+resolve_multirhs_LDADD = ../src/libipopt.la
+endif
 
 if !IPOPT_SINGLE
   nodist_hs071_f_SOURCES = hs071_f.f
@@ -65,6 +75,7 @@ AM_CPPFLAGS = \
   -I$(srcdir)/../src/LinAlg \
   -I$(srcdir)/../src/LinAlg/TMatrices \
   -I$(srcdir)/../src/Algorithm \
+  -I$(srcdir)/../src/Algorithm/LinearSolvers \
   -I$(srcdir)/../src/Interfaces \
   -I$(srcdir)/../contrib/sIPOPT/src \
   -I$(srcdir)/../contrib/sIPOPT/examples/parametric_cpp \
@@ -82,6 +93,10 @@ test: $(noinst_PROGRAMS)
 endif
 	chmod u+x ./run_unitTests
 	./run_unitTests
+
+if COIN_HAS_RESOLVE
+	./resolve_multirhs
+endif
 
 unitTest: test
 

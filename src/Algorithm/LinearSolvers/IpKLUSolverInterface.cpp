@@ -16,7 +16,7 @@ namespace Ipopt
 static const Index dbg_verbosity = 0;
 #endif
 
-KLUSolverInterface::KLUSolverInterface() : _val(NULL), _Numeric(NULL)
+KLUSolverInterface::KLUSolverInterface() : _val(NULL), _Symbolic(NULL), _Numeric(NULL)
 {
   DBG_START_METH("KLUSolverInterface::KLUSolverInterface()", dbg_verbosity);
   _rcond_val = 1e-128; 

@@ -9,29 +9,29 @@
 
 #include <fstream>
 #include <iomanip>
-#include <iostream>
 
 #include "IpoptConfig.h"
+#include <resolve/resolve_defs.hpp>
 
-#if RESOLVE_WITH_CUDA
-#include "NVMLHelper.hpp"
+#if defined(RESOLVE_USE_GPU) && !defined(RESOLVE_USE_CUDA) && !defined(RESOLVE_USE_HIP)
+# error "ReSolve GPU support requires either CUDA or HIP."
 #endif
 
-#include <resolve/matrix/Coo.hpp>
-#include <resolve/matrix/Csc.hpp>
 #include <resolve/matrix/Csr.hpp>
 #include <resolve/matrix/MatrixHandler.hpp>
 #include <resolve/matrix/io.hpp>
 #include <resolve/vector/Vector.hpp>
 #include <resolve/vector/VectorHandler.hpp>
+#include <resolve/GramSchmidt.hpp>
+#include <resolve/PreconditionerLU.hpp>
 
 #include <resolve/LinSolverDirectKLU.hpp>
 #include <resolve/workspace/LinAlgWorkspace.hpp>
 
-#if RESOLVE_WITH_GPU
+#ifdef RESOLVE_USE_GPU
 #include <resolve/LinSolverIterativeFGMRES.hpp>
 
-#if RESOLVE_WITH_CUDA
+#ifdef RESOLVE_USE_CUDA
 #include <resolve/LinSolverDirectCuSolverGLU.hpp>
 #include <resolve/LinSolverDirectCuSolverRf.hpp>
 using workspace_type = ReSolve::LinAlgWorkspaceCUDA;
@@ -59,8 +59,8 @@ namespace Ipopt
 
 static const std::string resolve_klu = "klu";
 
-#if RESOLVE_WITH_GPU
-#if RESOLVE_WITH_CUDA
+#ifdef RESOLVE_USE_GPU
+#ifdef RESOLVE_USE_CUDA
 static const std::string resolve_glu = "glu";
 # endif
 static const std::string resolve_rf = "rf";
@@ -138,17 +138,18 @@ private:
   Index ndim_;          ///< Number of dimensions
   Number* val_;         ///< Storage for variables
   Index numneg_;        ///< Number of negative pivots in last factorization
-  bool pivtol_changed_; ///< indicates if pivtol has been changed
   bool re_factorize_;
   bool factorize_;
   std::string method_;
   int n_iteration_;
 
   int k_;
+  Number pivot_tol_;
+  Index ordering_;
+  bool halt_if_singular_;
+
   Number rcond_val_;
   bool use_rcond_;
-
-  int factor_by_t_;
 
   ReSolve::LinSolverDirectKLU* resolve_KLU_;
   ReSolve::LinAlgWorkspaceCpu* workspace_CPU_;
@@ -158,13 +159,14 @@ private:
   ReSolve::vector::Vector* vec_x_;
 
 
-#if RESOLVE_WITH_GPU
+#ifdef RESOLVE_USE_GPU
   workspace_type* workspace_GPU_;
   rf_solver* resolve_Rf_;
-# if RESOLVE_WITH_CUDA
+# ifdef RESOLVE_USE_CUDA
   ReSolve::LinSolverDirectCuSolverGLU* resolve_GLU_;
 # endif
   ReSolve::GramSchmidt* GS_;
+  ReSolve::PreconditionerLU* resolve_preconditioner_;
   ReSolve::LinSolverIterativeFGMRES* resolve_FGMRES_;
 #endif
 
